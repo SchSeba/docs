@@ -62,6 +62,21 @@ For each `.md` file in `md/`:
    - Every `.md` file is listed in the README.md documents table
    - Every `.md` file has a card entry in index.html
 
+### Check D — GitHub Links
+
+Note: the canonical repository URL is defined in the `Makefile` as `REPO_URL`
+(default: `https://github.com/SchSeba/docs`). Read that value before checking
+links so validation works for forks that override `REPO_URL`.
+
+1. **index.html** must contain a link to the repository — either in a
+   contribute section or footer. It must also include a link to open PRs
+   (the `/pulls` URL).
+2. **Every HTML file** in `html/` must contain an "Edit source on GitHub" link
+   (class `.edit-link`) in the sidebar that points to the correct markdown
+   source file: `<REPO_URL>/blob/main/md/<filename>.md`
+3. Verify the link href matches the actual filename of the corresponding `.md`
+   source.
+
 ---
 
 ## Procedure
@@ -71,9 +86,10 @@ For each `.md` file in `md/`:
 3. For each markdown file, perform Check A
 4. Perform Check B by reading README.md and index.html
 5. Perform Check C using the file lists from steps 1-2
-6. Collect all failures
-7. If no failures: output `PASS`
-8. If any failures: output each as `FAIL: <filename> - <reason>`
+6. Perform Check D by checking GitHub links in index.html and all HTML files
+7. Collect all failures
+8. If no failures: output `PASS`
+9. If any failures: output each as `FAIL: <filename> - <reason>`
 
 ---
 
@@ -89,6 +105,9 @@ PASS
 FAIL: md/new-doc.md - no corresponding html/new-doc.html found
 FAIL: README.md - missing entry for md/new-doc.md
 FAIL: index.html - missing card for md/new-doc.md
+FAIL: index.html - missing repository link
+FAIL: html/new-doc.html - missing "Edit source on GitHub" link
+FAIL: html/dra-chainable-networking-proposal.html - edit link points to wrong file
 FAIL: md/dra-chainable-networking-proposal.md - heading "## 5. Mixed NICs" not found in HTML
 ```
 

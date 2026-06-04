@@ -77,6 +77,7 @@ body {
   border-right: 1px solid var(--border);
   overflow-y: auto;
   padding: 1.5rem 0;
+  padding-bottom: 3.5rem;
   z-index: 100;
 }
 
@@ -449,6 +450,34 @@ tr:nth-child(odd) { background: var(--code-bg); }
   font-weight: 400;
 }
 
+/* Sidebar footer with Edit link */
+.sidebar-footer {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 1rem 1.25rem;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.edit-link {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 0.75rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+
+.edit-link:hover {
+  color: var(--accent);
+  background: var(--surface-hover);
+}
+
 /* Responsive */
 @media (max-width: 900px) {
   .sidebar { display: none; }
@@ -484,6 +513,13 @@ Every generated page must follow this skeleton:
     <!-- h3 headings become .nav-link.sub -->
     <a class="nav-link sub" href="#id">N.M Subsection Title</a>
   </div>
+  <!-- Edit on GitHub link at bottom of sidebar -->
+  <div class="sidebar-footer">
+    <a class="edit-link" href="{{ REPO_URL }}/blob/main/md/{{ FILENAME }}.md" target="_blank" rel="noopener">
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M11.013 1.427a1.75 1.75 0 012.474 0l1.086 1.086a1.75 1.75 0 010 2.474l-8.61 8.61c-.21.21-.47.364-.756.445l-3.251.93a.75.75 0 01-.927-.928l.929-3.25a1.75 1.75 0 01.445-.758l8.61-8.61zm1.414 1.06a.25.25 0 00-.354 0L3.462 11.1a.25.25 0 00-.064.108l-.631 2.208 2.208-.63a.25.25 0 00.108-.064l8.61-8.61a.25.25 0 000-.354l-1.086-1.086z"/></svg>
+      Edit source on GitHub
+    </a>
+  </div>
 </nav>
 
 <!-- Main Content -->
@@ -504,6 +540,15 @@ Every generated page must follow this skeleton:
 </body>
 </html>
 ```
+
+### Repository URL
+
+The repository URL is defined in the `Makefile` as `REPO_URL` (default:
+`https://github.com/SchSeba/docs`). When generating HTML, use this base URL to
+construct the "Edit on GitHub" link:
+
+- Link target: `{{ REPO_URL }}/blob/main/md/{{ filename }}.md`
+- The link MUST point directly to the markdown source file in the repo
 
 ---
 
@@ -857,6 +902,7 @@ Before delivering the HTML file, verify:
 - [ ] All diagrams are numbered sequentially
 - [ ] **Cross-references** (depends on, related to, companion docs) are rendered as `.related-docs` with working links
 - [ ] Local `.md` links rewritten to `html/<basename>.html`
+- [ ] **"Edit source on GitHub" link** exists in the sidebar footer, pointing to the correct `md/` file in the repo
 - [ ] Page renders correctly with no JS (pure HTML + CSS)
 - [ ] File opens locally in any browser (`file://` protocol works)
 - [ ] Responsive layout works (sidebar hidden < 900px)
