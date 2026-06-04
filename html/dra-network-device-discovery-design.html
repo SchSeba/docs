@@ -1,0 +1,2016 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DRA Network Device Discovery and ResourceSlice Design</title>
+<style>
+:root {
+  --bg: #0f1117;
+  --surface: #161b22;
+  --surface-hover: #1c2129;
+  --border: #30363d;
+  --text: #c9d1d9;
+  --text-muted: #8b949e;
+  --text-bright: #f0f6fc;
+  --accent: #58a6ff;
+  --accent-dim: #1f6feb;
+  --green: #3fb950;
+  --green-dim: #238636;
+  --yellow: #d29922;
+  --yellow-dim: #9e6a03;
+  --red: #f85149;
+  --purple: #bc8cff;
+  --orange: #f0883e;
+  --cyan: #79c0ff;
+  --code-bg: #0d1117;
+  --code-border: #21262d;
+  --nav-width: 280px;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'SF Mono', Monaco, 'Cascadia Code', monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html { scroll-behavior: smooth; scroll-padding-top: 2rem; }
+
+body {
+  font-family: var(--font-sans);
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.7;
+  font-size: 16px;
+}
+
+/* Sidebar Navigation */
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: var(--nav-width);
+  height: 100vh;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  overflow-y: auto;
+  padding: 1.5rem 0;
+  z-index: 100;
+}
+
+.sidebar::-webkit-scrollbar { width: 4px; }
+.sidebar::-webkit-scrollbar-track { background: transparent; }
+.sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.sidebar-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--accent);
+  padding: 0 1.25rem 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 0.75rem;
+}
+
+.nav-section {
+  padding: 0 0.75rem;
+}
+
+.nav-link {
+  display: block;
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 0.82rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+  line-height: 1.4;
+}
+
+.nav-link:hover {
+  color: var(--text);
+  background: var(--surface-hover);
+}
+
+.nav-link.section {
+  font-weight: 600;
+  color: var(--text);
+  margin-top: 0.5rem;
+}
+
+.nav-link.sub {
+  padding-left: 1.5rem;
+  font-size: 0.78rem;
+}
+
+/* Main Content */
+.main {
+  margin-left: var(--nav-width);
+  max-width: 1100px;
+  padding: 3rem 4rem;
+}
+
+/* Typography */
+h1 {
+  font-size: 2.5rem;
+  font-weight: 800;
+  color: var(--text-bright);
+  margin-bottom: 0.75rem;
+  letter-spacing: -0.5px;
+}
+
+.subtitle {
+  font-size: 1.1rem;
+  color: var(--text-muted);
+  margin-bottom: 1.5rem;
+  line-height: 1.6;
+}
+
+h2 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--text-bright);
+  margin-top: 3.5rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-bright);
+  margin-top: 2.5rem;
+  margin-bottom: 0.75rem;
+}
+
+h4 {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+p { margin-bottom: 1rem; }
+
+ul, ol {
+  margin-bottom: 1rem;
+  padding-left: 1.5rem;
+}
+
+li { margin-bottom: 0.4rem; }
+
+strong { color: var(--text-bright); }
+
+code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  background: var(--code-bg);
+  border: 1px solid var(--code-border);
+  border-radius: 4px;
+  padding: 0.15em 0.4em;
+  color: var(--cyan);
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a:hover { text-decoration: underline; }
+
+hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 3rem 0;
+}
+
+/* Badge Pills */
+.badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.2em 0.6em;
+  border-radius: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  vertical-align: middle;
+}
+
+.badge-nic { background: #1f3a5f; color: #58a6ff; }
+.badge-gpu { background: #2d1f3f; color: #bc8cff; }
+.badge-bond { background: #1f3f2a; color: #3fb950; }
+.badge-vlan { background: #3f2d1f; color: #f0883e; }
+.badge-tuning { background: #3f3f1f; color: #d29922; }
+.badge-vfio { background: #3f1f1f; color: #f85149; }
+.badge-sriov { background: #1f3a5f; color: #79c0ff; }
+
+/* Constraint / Info Banners */
+.constraint-banner {
+  background: linear-gradient(135deg, #1a1f35, #161b22);
+  border: 1px solid var(--accent-dim);
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 2rem;
+  font-size: 0.9rem;
+}
+
+.constraint-banner strong { color: var(--accent); }
+
+/* Code Blocks */
+.code-block {
+  background: var(--code-bg);
+  border: 1px solid var(--code-border);
+  border-radius: 8px;
+  margin: 1.25rem 0;
+  overflow: hidden;
+}
+
+.code-header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--code-border);
+  padding: 0.5rem 1rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.code-header .lang-badge {
+  background: var(--accent-dim);
+  color: var(--accent);
+  padding: 0.1em 0.5em;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.code-content {
+  padding: 1rem 1.25rem;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  line-height: 1.7;
+  white-space: pre;
+}
+
+/* YAML Syntax highlighting */
+.y-key { color: #79c0ff; }
+.y-str { color: #a5d6ff; }
+.y-num { color: #79c0ff; }
+.y-bool { color: #ff7b72; }
+.y-comment { color: #8b949e; font-style: italic; }
+.y-ref { color: #d2a8ff; }
+.y-type { color: #ffa657; }
+.y-anchor { color: #7ee787; }
+
+/* Tables */
+.table-wrapper {
+  overflow-x: auto;
+  margin: 1.25rem 0;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+thead {
+  background: var(--accent-dim);
+}
+
+th {
+  color: var(--text-bright);
+  font-weight: 600;
+  text-align: left;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+td {
+  padding: 0.65rem 1rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+tr:last-child td { border-bottom: none; }
+tr:nth-child(even) { background: var(--surface); }
+tr:nth-child(odd) { background: var(--code-bg); }
+
+/* Callout Boxes */
+.callout {
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  margin: 1.25rem 0;
+  border-left: 4px solid;
+  font-size: 0.9rem;
+}
+
+.callout-info {
+  background: #0d2847;
+  border-color: var(--accent);
+}
+
+.callout-warning {
+  background: #2d1f0d;
+  border-color: var(--yellow);
+}
+
+.callout-success {
+  background: #0d2d1a;
+  border-color: var(--green);
+}
+
+.callout-idea {
+  background: #1f0d2d;
+  border-color: var(--purple);
+}
+
+.callout-title {
+  font-weight: 700;
+  margin-bottom: 0.4rem;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.callout-info .callout-title { color: var(--accent); }
+.callout-warning .callout-title { color: var(--yellow); }
+.callout-success .callout-title { color: var(--green); }
+.callout-idea .callout-title { color: var(--purple); }
+
+/* Diagram containers */
+.diagram-container {
+  margin: 2rem 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.5rem;
+  overflow-x: auto;
+  min-width: 750px;
+}
+
+.diagram-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.diagram-container svg {
+  display: block;
+  margin: 0 auto;
+}
+
+/* Flow steps */
+.flow-steps {
+  margin: 1.5rem 0;
+}
+
+.flow-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.flow-step-num {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--accent-dim);
+  color: var(--accent);
+  font-size: 0.75rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.flow-step-content {
+  font-size: 0.9rem;
+  flex: 1;
+}
+
+/* ASCII diagram in code block */
+.ascii-diagram {
+  background: var(--code-bg);
+  border: 1px solid var(--code-border);
+  border-radius: 8px;
+  padding: 1.25rem;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  white-space: pre;
+  color: var(--text-muted);
+}
+
+/* Section number indicator */
+.section-num {
+  color: var(--accent);
+  font-weight: 400;
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+  .sidebar { display: none; }
+  .main { margin-left: 0; padding: 2rem 1.5rem; }
+}
+</style>
+</head>
+<body>
+
+<!-- Sidebar Navigation -->
+<nav class="sidebar">
+  <div class="sidebar-title">Device Discovery Design</div>
+  <div class="nav-section">
+    <a class="nav-link section" href="#overview">1. Overview and Design Principles</a>
+    <a class="nav-link sub" href="#cardinal-rule">The Cardinal Rule</a>
+    <a class="nav-link sub" href="#why-this-matters">Why This Matters</a>
+    <a class="nav-link sub" href="#other-design-decisions">Other Design Decisions</a>
+    <a class="nav-link section" href="#crd-schema">2. DeviceExposurePolicy CRD Schema</a>
+    <a class="nav-link sub" href="#full-crd">2.1 Full CRD Definition</a>
+    <a class="nav-link sub" href="#field-semantics">2.2 Field Semantics</a>
+    <a class="nav-link sub" href="#policy-resolution">2.3 Policy Resolution</a>
+    <a class="nav-link section" href="#exclusion-groups">3. How Exclusion Groups Work</a>
+    <a class="nav-link sub" href="#the-pattern">3.1 The Pattern</a>
+    <a class="nav-link sub" href="#why-not-single-device">3.2 Why Not Single-Device?</a>
+    <a class="nav-link sub" href="#consumes-counters-multi">3.3 consumesCounters + MultiAlloc</a>
+    <a class="nav-link sub" href="#fallback">3.4 Fallback: Admin-Separated</a>
+    <a class="nav-link sub" href="#exclusion-summary">3.5 Summary</a>
+    <a class="nav-link section" href="#driver-uses-policies">4. How the Driver Uses Policies</a>
+    <a class="nav-link sub" href="#attribute-translation">4.1 Attribute Translation</a>
+    <a class="nav-link sub" href="#policy-driven-fields">4.2 Policy-Driven Fields</a>
+    <a class="nav-link sub" href="#shared-counters-auto">4.3 SharedCounters: Automatic</a>
+    <a class="nav-link sub" href="#translation-algorithm">4.4 Translation Algorithm</a>
+    <a class="nav-link section" href="#examples">5. Examples</a>
+    <a class="nav-link sub" href="#example-1">5.1 Simple SR-IOV VFs</a>
+    <a class="nav-link sub" href="#example-2">5.2 VFs with Multiple CNIs</a>
+    <a class="nav-link sub" href="#example-3">5.3 PF as Macvlan Parent</a>
+    <a class="nav-link sub" href="#example-4">5.4 Macvlan AND Ipvlan</a>
+    <a class="nav-link sub" href="#example-5">5.5 Macvlan AND Host-Device</a>
+    <a class="nav-link sub" href="#example-6">5.6 PF + VFs + Macvlan + Passthrough</a>
+    <a class="nav-link sub" href="#example-7">5.7 VF as Bridge Port OR SR-IOV</a>
+    <a class="nav-link sub" href="#example-8">5.8 Excluding Cluster CNI</a>
+    <a class="nav-link sub" href="#example-9">5.9 OVN-K via Generic Driver</a>
+    <a class="nav-link section" href="#reference-node">6. Complete Reference Node</a>
+    <a class="nav-link sub" href="#node-inventory">6.1 Node Inventory</a>
+    <a class="nav-link sub" href="#complete-policy-set">6.2 Complete Policy Set</a>
+    <a class="nav-link sub" href="#resulting-slices">6.3 Resulting ResourceSlices</a>
+    <a class="nav-link sub" href="#ref-summary">6.4 Summary</a>
+    <a class="nav-link sub" href="#app-developer">6.5 App Developer Experience</a>
+    <a class="nav-link section" href="#open-questions">7. Open Questions</a>
+  </div>
+</nav>
+
+<!-- Main Content -->
+<main class="main">
+  <h1>DRA Network Device Discovery &amp; ResourceSlice Design</h1>
+  <p class="subtitle">Specifies how the DRA network driver discovers host network devices and publishes them as ResourceSlices for scheduler-aware allocation. This is the selected design — companion to the DRA Chainable Networking Proposal and the Discovery Brainstorm.</p>
+
+  <div class="constraint-banner">
+    <strong>Upstream dependencies:</strong>
+    <a href="https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/4815-dra-scalable-shared-counters">KEP 4815 — SharedCounters</a> (GA, K8s 1.35+) |
+    <a href="https://github.com/kubernetes/enhancements/blob/master/keps/sig-scheduling/5075-dra-consumable-capacity/README.md">KEP 5075 — Consumable Capacity</a> (Beta, K8s 1.36) |
+    <a href="https://github.com/kubernetes/enhancements/tree/master/keps/sig-node/5941-scalable-dra-shared-consumable-capacity">KEP 5941 — Shared Consumable Capacity</a> |
+    <a href="https://kubernetes.io/docs/concepts/scheduling-eviction/dynamic-resource-allocation/#list-type-attributes">KEP 5491 — DRAListTypeAttributes</a> (Alpha, K8s 1.36)
+  </div>
+
+  <!-- Section 1 -->
+  <h2 id="overview"><span class="section-num">1.</span> Overview and Design Principles</h2>
+
+  <h3 id="cardinal-rule">The Cardinal Rule: The Driver Is Generic</h3>
+
+  <p>The DRA network driver is a <strong>generic interface discovery engine</strong>. It walks <code>/sys/class/net</code>, reads sysfs and netlink, and produces a bag of raw facts about every interface on the node: name, MAC, MTU, PCI address, NUMA node, driver, link speed, parent PF, VF index, bridge membership, etc.</p>
+
+  <p><strong>The driver does NOT know:</strong></p>
+  <ul>
+    <li>What a "macvlan" is, or how many can fit on an interface.</li>
+    <li>That <code>sriov-cni</code> moves a VF and <code>host-device</code> moves a PF.</li>
+    <li>That macvlan and ipvlan conflict on the same parent.</li>
+    <li>That allocating a PF for passthrough destroys its VFs.</li>
+    <li>How much capacity a bridge has, or what "ports" means.</li>
+  </ul>
+
+  <p><strong>All of that knowledge lives in the <code>DeviceExposurePolicy</code> CRD.</strong> The cluster administrator creates policies that tell the driver:</p>
+  <ol>
+    <li>Which devices to expose (and which to hide).</li>
+    <li>Whether a device supports multiple simultaneous allocations.</li>
+    <li>What capacity counters to publish and how much each allocation consumes.</li>
+    <li>Which CNI plugins are compatible with the device.</li>
+    <li>Which plugins conflict with each other (exclusion groups).</li>
+  </ol>
+
+  <p>The driver reads these policies and mechanically translates them into ResourceSlice fields. It does not interpret or validate the CNI-level semantics — it is a policy executor, not a policy author.</p>
+
+  <!-- Diagram 1: Device Discovery Flow -->
+  <div class="diagram-container">
+    <div class="diagram-title">Diagram 1 — Device Discovery Flow</div>
+    <svg width="780" height="320" viewBox="0 0 780 320" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="arrow1" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#58a6ff"/>
+        </marker>
+      </defs>
+      <!-- Hardware layer -->
+      <rect x="20" y="30" width="140" height="55" rx="8" fill="#1f3a5f" stroke="#58a6ff" stroke-width="1.5"/>
+      <text x="90" y="52" text-anchor="middle" fill="#c9d1d9" font-size="11" font-weight="600">Hardware</text>
+      <text x="90" y="70" text-anchor="middle" fill="#79c0ff" font-size="9">/sys/class/net, netlink</text>
+
+      <!-- Driver -->
+      <rect x="210" y="30" width="140" height="55" rx="8" fill="#1f3a5f" stroke="#58a6ff" stroke-width="1.5"/>
+      <text x="280" y="52" text-anchor="middle" fill="#c9d1d9" font-size="11" font-weight="600">DRA Network Driver</text>
+      <text x="280" y="70" text-anchor="middle" fill="#79c0ff" font-size="9">Generic Discovery Engine</text>
+
+      <!-- Policy evaluation -->
+      <rect x="400" y="30" width="160" height="55" rx="8" fill="#3f3f1f" stroke="#d29922" stroke-width="1.5"/>
+      <text x="480" y="52" text-anchor="middle" fill="#c9d1d9" font-size="11" font-weight="600">Policy Evaluation</text>
+      <text x="480" y="70" text-anchor="middle" fill="#d29922" font-size="9">DeviceExposurePolicy CRDs</text>
+
+      <!-- ResourceSlice output -->
+      <rect x="610" y="30" width="145" height="55" rx="8" fill="#1f3f2a" stroke="#3fb950" stroke-width="1.5"/>
+      <text x="682" y="52" text-anchor="middle" fill="#c9d1d9" font-size="11" font-weight="600">ResourceSlice</text>
+      <text x="682" y="70" text-anchor="middle" fill="#3fb950" font-size="9">Published to API Server</text>
+
+      <!-- Arrows top row -->
+      <line x1="160" y1="57" x2="205" y2="57" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arrow1)"/>
+      <line x1="350" y1="57" x2="395" y2="57" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arrow1)"/>
+      <line x1="560" y1="57" x2="605" y2="57" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arrow1)"/>
+
+      <!-- Detail boxes below -->
+      <rect x="20" y="120" width="170" height="90" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+      <text x="105" y="140" text-anchor="middle" fill="#8b949e" font-size="10" font-weight="600">RAW FACTS</text>
+      <text x="105" y="158" text-anchor="middle" fill="#c9d1d9" font-size="9">ifName, MAC, MTU</text>
+      <text x="105" y="173" text-anchor="middle" fill="#c9d1d9" font-size="9">PCI addr, NUMA, driver</text>
+      <text x="105" y="188" text-anchor="middle" fill="#c9d1d9" font-size="9">PF/VF relationships</text>
+      <text x="105" y="203" text-anchor="middle" fill="#c9d1d9" font-size="9">bridge membership</text>
+
+      <rect x="220" y="120" width="170" height="90" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+      <text x="305" y="140" text-anchor="middle" fill="#8b949e" font-size="10" font-weight="600">DRIVER LOGIC</text>
+      <text x="305" y="158" text-anchor="middle" fill="#c9d1d9" font-size="9">Walk /sys/class/net</text>
+      <text x="305" y="173" text-anchor="middle" fill="#c9d1d9" font-size="9">Read sysfs + netlink</text>
+      <text x="305" y="188" text-anchor="middle" fill="#c9d1d9" font-size="9">Classify device type</text>
+      <text x="305" y="203" text-anchor="middle" fill="#c9d1d9" font-size="9">Auto PF/VF counters</text>
+
+      <rect x="415" y="120" width="170" height="90" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+      <text x="500" y="140" text-anchor="middle" fill="#8b949e" font-size="10" font-weight="600">POLICY RULES</text>
+      <text x="500" y="158" text-anchor="middle" fill="#c9d1d9" font-size="9">CEL selector matching</text>
+      <text x="500" y="173" text-anchor="middle" fill="#c9d1d9" font-size="9">exclude vs expose</text>
+      <text x="500" y="188" text-anchor="middle" fill="#c9d1d9" font-size="9">priority resolution</text>
+      <text x="500" y="203" text-anchor="middle" fill="#c9d1d9" font-size="9">capacity + CNI config</text>
+
+      <rect x="610" y="120" width="145" height="90" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+      <text x="682" y="140" text-anchor="middle" fill="#8b949e" font-size="10" font-weight="600">OUTPUT</text>
+      <text x="682" y="158" text-anchor="middle" fill="#c9d1d9" font-size="9">Device entries</text>
+      <text x="682" y="173" text-anchor="middle" fill="#c9d1d9" font-size="9">Shared counters</text>
+      <text x="682" y="188" text-anchor="middle" fill="#c9d1d9" font-size="9">Capacity fields</text>
+      <text x="682" y="203" text-anchor="middle" fill="#c9d1d9" font-size="9">Attributes</text>
+
+      <!-- Connecting lines -->
+      <line x1="105" y1="90" x2="105" y2="115" stroke="#30363d" stroke-width="1" stroke-dasharray="4"/>
+      <line x1="305" y1="90" x2="305" y2="115" stroke="#30363d" stroke-width="1" stroke-dasharray="4"/>
+      <line x1="500" y1="90" x2="500" y2="115" stroke="#30363d" stroke-width="1" stroke-dasharray="4"/>
+      <line x1="682" y1="90" x2="682" y2="115" stroke="#30363d" stroke-width="1" stroke-dasharray="4"/>
+
+      <!-- Deny-by-default note -->
+      <rect x="220" y="240" width="340" height="50" rx="8" fill="#2d1f0d" stroke="#d29922" stroke-width="1"/>
+      <text x="390" y="262" text-anchor="middle" fill="#d29922" font-size="10" font-weight="600">DENY-BY-DEFAULT</text>
+      <text x="390" y="278" text-anchor="middle" fill="#c9d1d9" font-size="9">If no DeviceExposurePolicy matches → device is NOT published</text>
+    </svg>
+  </div>
+
+  <h3 id="why-this-matters">Why This Matters</h3>
+  <ul>
+    <li><strong>Extensibility.</strong> New CNI plugins, new sharing patterns, or new conflict rules require only a new <code>DeviceExposurePolicy</code> — no driver code changes.</li>
+    <li><strong>Correctness by construction.</strong> The admin who understands the hardware and the CNI ecosystem encodes that knowledge once. The driver applies it uniformly.</li>
+    <li><strong>Debuggability.</strong> If a device has the wrong capacity or the wrong <code>supportedCNIs</code>, the admin inspects the policy, not the driver source.</li>
+  </ul>
+
+  <h3 id="other-design-decisions">Other Design Decisions</h3>
+  <ol>
+    <li><strong>Every real host interface is a device.</strong> PFs, VFs, bridges, regular NICs, and VLAN interfaces are published as real devices — not synthetic slots.</li>
+    <li><strong>Shared devices use <code>allowMultipleAllocations: true</code> with consumable capacity</strong> (KEP 5075, Beta K8s 1.36). No synthetic slot duplication.</li>
+    <li><strong>Exclusive devices use normal allocation.</strong> When an exclusive plugin (e.g. <code>host-device</code>) coexists with a shared plugin (e.g. <code>macvlan</code>) on the same physical interface, the driver publishes <strong>two device entries</strong> that share a counter set.</li>
+    <li><strong>PF/VF mutual exclusion uses shared counters</strong> (KEP 4815, GA K8s 1.35+). Slot counter <code>exclusion-slots = numVFs + 1</code>. PF consumes all; each VF consumes 1.</li>
+    <li><strong>Bandwidth sharing uses shared counters</strong> with <code>requestPolicy</code> and <code>valueFrom</code> (KEP 5941).</li>
+    <li><strong>Deny-by-default.</strong> If no <code>DeviceExposurePolicy</code> matches a device, it is not published in any ResourceSlice.</li>
+    <li><strong>CNI compatibility validated at scheduling time.</strong> Generated DeviceClasses include <code>supportedCNIs.includes("&lt;cni-type&gt;")</code> in CEL selectors.</li>
+  </ol>
+
+  <hr>
+
+  <!-- Section 2 -->
+  <h2 id="crd-schema"><span class="section-num">2.</span> DeviceExposurePolicy CRD Schema</h2>
+
+  <h3 id="full-crd">2.1 Full CRD Definition</h3>
+
+  <div class="code-block">
+    <div class="code-header"><span class="lang-badge">YAML</span> DeviceExposurePolicy CRD</div>
+    <div class="code-content"><span class="y-key">apiVersion</span>: <span class="y-str">networking.dra.io/v1alpha1</span>
+<span class="y-key">kind</span>: <span class="y-str">DeviceExposurePolicy</span>
+<span class="y-key">metadata</span>:
+  <span class="y-key">name</span>: <span class="y-str">&lt;policy-name&gt;</span>          <span class="y-comment"># cluster-scoped</span>
+<span class="y-key">spec</span>:
+  <span class="y-comment"># ── Targeting ──</span>
+
+  <span class="y-comment"># Which nodes this policy applies to. Optional; defaults to all nodes.</span>
+  <span class="y-key">nodeSelector</span>:
+    <span class="y-key">matchLabels</span>:
+      <span class="y-key">&lt;key&gt;</span>: <span class="y-str">&lt;value&gt;</span>
+
+  <span class="y-comment"># Higher priority wins when multiple expose policies match the same device.</span>
+  <span class="y-comment"># Range: 0–1000. Default: 100.</span>
+  <span class="y-key">priority</span>: <span class="y-num">100</span>
+
+  <span class="y-comment"># CEL expression evaluated against each discovered device's raw attributes.</span>
+  <span class="y-key">selector</span>:
+    <span class="y-key">cel</span>: <span class="y-str">"&lt;CEL expression&gt;"</span>
+
+  <span class="y-comment"># "expose" publishes the device; "exclude" hides it. Default: "expose".</span>
+  <span class="y-key">action</span>: <span class="y-str">expose</span>   <span class="y-comment"># | exclude</span>
+
+  <span class="y-comment"># ── Exposure Configuration (only when action=expose) ──</span>
+  <span class="y-key">exposure</span>:
+    <span class="y-key">deviceNameSuffix</span>: <span class="y-str">""</span>
+    <span class="y-key">allowMultipleAllocations</span>: <span class="y-bool">false</span>
+
+    <span class="y-key">capacity</span>:
+      <span class="y-key">&lt;counterName&gt;</span>:
+        <span class="y-key">value</span>: <span class="y-str">"&lt;total capacity&gt;"</span>
+        <span class="y-key">requestPolicy</span>:
+          <span class="y-key">default</span>: <span class="y-str">"&lt;default per claim&gt;"</span>
+          <span class="y-key">validRange</span>:
+            <span class="y-key">min</span>: <span class="y-str">"&lt;minimum&gt;"</span>
+            <span class="y-key">max</span>: <span class="y-str">"&lt;maximum&gt;"</span>
+            <span class="y-key">step</span>: <span class="y-str">"&lt;granularity&gt;"</span>
+
+    <span class="y-key">supportedCNIPlugins</span>:
+      - <span class="y-key">name</span>: <span class="y-str">&lt;cni-binary-name&gt;</span>
+        <span class="y-key">consumePerAllocation</span>:
+          <span class="y-key">&lt;counterName&gt;</span>: <span class="y-num">&lt;amount&gt;</span>
+        <span class="y-key">exclusive</span>: <span class="y-bool">false</span>
+
+    <span class="y-key">exclusionGroup</span>: <span class="y-str">""</span>
+
+    <span class="y-key">additionalAttributes</span>:
+      <span class="y-key">&lt;key&gt;</span>: <span class="y-str">&lt;value&gt;</span></div>
+  </div>
+
+  <h3 id="field-semantics">2.2 Field Semantics</h3>
+
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr><th>Field</th><th>Required</th><th>Default</th><th>Description</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>nodeSelector</code></td><td>No</td><td>All nodes</td><td>Standard label selector to scope the policy to specific nodes</td></tr>
+        <tr><td><code>priority</code></td><td>No</td><td>100</td><td>Conflict resolution among matching <code>expose</code> policies. Higher wins.</td></tr>
+        <tr><td><code>selector.cel</code></td><td>Yes</td><td>—</td><td>CEL expression against the device's discovered attributes</td></tr>
+        <tr><td><code>action</code></td><td>No</td><td><code>expose</code></td><td><code>expose</code> publishes the device; <code>exclude</code> hides it</td></tr>
+        <tr><td><code>exposure.deviceNameSuffix</code></td><td>No</td><td><code>""</code></td><td>Appended to interface name. Enables multiple entries for the same physical interface.</td></tr>
+        <tr><td><code>exposure.allowMultipleAllocations</code></td><td>No</td><td><code>false</code></td><td>Maps directly to the ResourceSlice device field</td></tr>
+        <tr><td><code>exposure.capacity</code></td><td>No</td><td>—</td><td>Capacity counters for shared devices</td></tr>
+        <tr><td><code>exposure.supportedCNIPlugins</code></td><td>No</td><td>—</td><td>CNI compatibility list; flows into <code>supportedCNIs</code> attribute</td></tr>
+        <tr><td><code>exposure.supportedCNIPlugins[].exclusive</code></td><td>No</td><td><code>false</code></td><td>Exclusive plugins consume all capacity counters</td></tr>
+        <tr><td><code>exposure.exclusionGroup</code></td><td>No</td><td><code>""</code></td><td>Label linking policies that exclude each other via shared counters</td></tr>
+        <tr><td><code>exposure.additionalAttributes</code></td><td>No</td><td>—</td><td>Extra attributes merged into the device</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 id="policy-resolution">2.3 Policy Resolution</h3>
+
+  <!-- Diagram 2: Policy Resolution Flow -->
+  <div class="diagram-container">
+    <div class="diagram-title">Diagram 2 — Policy Resolution Flow</div>
+    <svg width="750" height="420" viewBox="0 0 750 420" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="arrow2" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#58a6ff"/>
+        </marker>
+        <marker id="arrow2r" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#f85149"/>
+        </marker>
+        <marker id="arrow2g" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#3fb950"/>
+        </marker>
+      </defs>
+
+      <!-- Start -->
+      <rect x="280" y="20" width="180" height="40" rx="8" fill="#1f3a5f" stroke="#58a6ff" stroke-width="1.5"/>
+      <text x="370" y="45" text-anchor="middle" fill="#c9d1d9" font-size="11" font-weight="600">Discovered Device D</text>
+
+      <!-- Step 1: Collect matching -->
+      <rect x="250" y="85" width="240" height="40" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+      <text x="370" y="110" text-anchor="middle" fill="#c9d1d9" font-size="10">1. Collect policies (nodeSelector + CEL)</text>
+
+      <!-- Step 2: Check exclude -->
+      <rect x="250" y="150" width="240" height="40" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+      <text x="370" y="175" text-anchor="middle" fill="#c9d1d9" font-size="10">2. Any action=exclude?</text>
+
+      <!-- Hidden (exclude) -->
+      <rect x="560" y="150" width="120" height="40" rx="8" fill="#3f1f1f" stroke="#f85149" stroke-width="1.5"/>
+      <text x="620" y="175" text-anchor="middle" fill="#f85149" font-size="10" font-weight="600">HIDDEN</text>
+
+      <!-- Step 3: Check any match -->
+      <rect x="250" y="215" width="240" height="40" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+      <text x="370" y="240" text-anchor="middle" fill="#c9d1d9" font-size="10">3. No policy matches?</text>
+
+      <!-- Hidden (deny-by-default) -->
+      <rect x="560" y="215" width="120" height="40" rx="8" fill="#3f1f1f" stroke="#f85149" stroke-width="1.5"/>
+      <text x="620" y="235" text-anchor="middle" fill="#f85149" font-size="10" font-weight="600">HIDDEN</text>
+      <text x="620" y="248" text-anchor="middle" fill="#8b949e" font-size="8">(deny-by-default)</text>
+
+      <!-- Step 4: Group by suffix -->
+      <rect x="250" y="280" width="240" height="40" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+      <text x="370" y="305" text-anchor="middle" fill="#c9d1d9" font-size="10">4. Group by deviceNameSuffix</text>
+
+      <!-- Step 5: Highest priority per group -->
+      <rect x="250" y="345" width="240" height="40" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1.5"/>
+      <text x="370" y="370" text-anchor="middle" fill="#c9d1d9" font-size="10">5. Pick highest priority per group</text>
+
+      <!-- Output -->
+      <rect x="280" y="395" width="180" height="25" rx="6" fill="#1f3f2a" stroke="#3fb950" stroke-width="1.5"/>
+      <text x="370" y="412" text-anchor="middle" fill="#3fb950" font-size="10" font-weight="600">One device entry per group</text>
+
+      <!-- Arrows -->
+      <line x1="370" y1="60" x2="370" y2="80" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arrow2)"/>
+      <line x1="370" y1="125" x2="370" y2="145" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arrow2)"/>
+      <line x1="490" y1="170" x2="555" y2="170" stroke="#f85149" stroke-width="1.5" marker-end="url(#arrow2r)"/>
+      <text x="522" y="163" text-anchor="middle" fill="#f85149" font-size="9">YES</text>
+      <line x1="370" y1="190" x2="370" y2="210" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arrow2)"/>
+      <text x="355" y="203" text-anchor="end" fill="#3fb950" font-size="9">NO</text>
+      <line x1="490" y1="235" x2="555" y2="235" stroke="#f85149" stroke-width="1.5" marker-end="url(#arrow2r)"/>
+      <text x="522" y="228" text-anchor="middle" fill="#f85149" font-size="9">YES</text>
+      <line x1="370" y1="255" x2="370" y2="275" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arrow2)"/>
+      <text x="355" y="268" text-anchor="end" fill="#3fb950" font-size="9">NO</text>
+      <line x1="370" y1="320" x2="370" y2="340" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arrow2)"/>
+      <line x1="370" y1="385" x2="370" y2="392" stroke="#3fb950" stroke-width="1.5" marker-end="url(#arrow2g)"/>
+    </svg>
+  </div>
+
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr><th>Rule</th><th>Rationale</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Deny-by-default</td><td>Undeclared devices are never accidentally exposed</td></tr>
+        <tr><td>Exclusion always wins</td><td>Infrastructure protection cannot be overridden by an expose policy</td></tr>
+        <tr><td>Highest priority wins</td><td>Predictable, auditable conflict resolution for expose policies</td></tr>
+        <tr><td>Cluster-scoped</td><td>Network device exposure is a platform-level concern</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <hr>
+
+  <!-- Section 3 -->
+  <h2 id="exclusion-groups"><span class="section-num">3.</span> How Exclusion Groups Work: The Dual-Device Pattern</h2>
+
+  <p>All mutual exclusion in this design follows a single pattern: <strong>separate device entries sharing a counter set</strong>.</p>
+
+  <h3 id="the-pattern">3.1 The Pattern</h3>
+
+  <!-- Diagram 7: Exclusion Group Mechanisms -->
+  <div class="diagram-container">
+    <div class="diagram-title">Diagram 7 — Exclusion Group Mechanisms (A, B, C)</div>
+    <svg width="780" height="480" viewBox="0 0 780 480" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="arrow7" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#58a6ff"/>
+        </marker>
+      </defs>
+
+      <!-- Mechanism A -->
+      <rect x="20" y="15" width="740" height="130" rx="8" fill="#161b22" stroke="#3fb950" stroke-width="1.5"/>
+      <text x="50" y="38" fill="#3fb950" font-size="11" font-weight="700">MECHANISM A — exclusionGroup (shared vs shared)</text>
+      <text x="50" y="55" fill="#8b949e" font-size="9">Example 4: macvlan vs ipvlan (kernel rx_handler conflict)</text>
+
+      <rect x="50" y="65" width="200" height="60" rx="6" fill="#1f3a5f" stroke="#58a6ff" stroke-width="1"/>
+      <text x="150" y="82" text-anchor="middle" fill="#c9d1d9" font-size="9" font-weight="600">enp3s0f1-macvlan</text>
+      <text x="150" y="97" text-anchor="middle" fill="#79c0ff" font-size="8">allowMultipleAlloc: true</text>
+      <text x="150" y="112" text-anchor="middle" fill="#8b949e" font-size="8">consumesCounters: ipvlan: 64</text>
+
+      <rect x="290" y="70" width="140" height="50" rx="6" fill="#3f3f1f" stroke="#d29922" stroke-width="1.5"/>
+      <text x="360" y="88" text-anchor="middle" fill="#d29922" font-size="9" font-weight="600">SharedCounters</text>
+      <text x="360" y="103" text-anchor="middle" fill="#c9d1d9" font-size="8">macvlan: 64 | ipvlan: 64</text>
+      <text x="360" y="115" text-anchor="middle" fill="#8b949e" font-size="7">exclusionGroup: "rx-handler"</text>
+
+      <rect x="470" y="65" width="200" height="60" rx="6" fill="#1f3a5f" stroke="#58a6ff" stroke-width="1"/>
+      <text x="570" y="82" text-anchor="middle" fill="#c9d1d9" font-size="9" font-weight="600">enp3s0f1-ipvlan</text>
+      <text x="570" y="97" text-anchor="middle" fill="#79c0ff" font-size="8">allowMultipleAlloc: true</text>
+      <text x="570" y="112" text-anchor="middle" fill="#8b949e" font-size="8">consumesCounters: macvlan: 64</text>
+
+      <line x1="250" y1="95" x2="285" y2="95" stroke="#d29922" stroke-width="1.5" marker-end="url(#arrow7)"/>
+      <line x1="430" y1="95" x2="465" y2="95" stroke="#d29922" stroke-width="1.5" marker-end="url(#arrow7)"/>
+
+      <!-- Mechanism B -->
+      <rect x="20" y="165" width="740" height="130" rx="8" fill="#161b22" stroke="#f85149" stroke-width="1.5"/>
+      <text x="50" y="188" fill="#f85149" font-size="11" font-weight="700">MECHANISM B — exclusive: true (shared vs exclusive)</text>
+      <text x="50" y="205" fill="#8b949e" font-size="9">Example 5: macvlan vs host-device passthrough</text>
+
+      <rect x="50" y="215" width="200" height="60" rx="6" fill="#1f3a5f" stroke="#58a6ff" stroke-width="1"/>
+      <text x="150" y="232" text-anchor="middle" fill="#c9d1d9" font-size="9" font-weight="600">enp3s0f0-macvlan</text>
+      <text x="150" y="247" text-anchor="middle" fill="#79c0ff" font-size="8">allowMultipleAlloc: true</text>
+      <text x="150" y="262" text-anchor="middle" fill="#8b949e" font-size="8">capacity: macvlans = 64</text>
+
+      <rect x="290" y="220" width="140" height="50" rx="6" fill="#3f3f1f" stroke="#d29922" stroke-width="1.5"/>
+      <text x="360" y="238" text-anchor="middle" fill="#d29922" font-size="9" font-weight="600">SharedCounters</text>
+      <text x="360" y="255" text-anchor="middle" fill="#c9d1d9" font-size="8">macvlan-capacity: 64</text>
+
+      <rect x="470" y="215" width="200" height="60" rx="6" fill="#3f1f1f" stroke="#f85149" stroke-width="1"/>
+      <text x="570" y="232" text-anchor="middle" fill="#c9d1d9" font-size="9" font-weight="600">enp3s0f0-passthrough</text>
+      <text x="570" y="247" text-anchor="middle" fill="#f85149" font-size="8">exclusive (normal device)</text>
+      <text x="570" y="262" text-anchor="middle" fill="#8b949e" font-size="8">consumesCounters: ALL (64)</text>
+
+      <line x1="250" y1="245" x2="285" y2="245" stroke="#d29922" stroke-width="1.5" marker-end="url(#arrow7)"/>
+      <line x1="430" y1="245" x2="465" y2="245" stroke="#f85149" stroke-width="1.5" marker-end="url(#arrow7)"/>
+
+      <!-- Mechanism C -->
+      <rect x="20" y="315" width="740" height="145" rx="8" fill="#161b22" stroke="#79c0ff" stroke-width="1.5"/>
+      <text x="50" y="338" fill="#79c0ff" font-size="11" font-weight="700">MECHANISM C — PF/VF hardware mutex (automatic)</text>
+      <text x="50" y="355" fill="#8b949e" font-size="9">Example 6: PF passthrough destroys VFs. No policy field needed — from sysfs.</text>
+
+      <rect x="50" y="365" width="160" height="50" rx="6" fill="#1f3a5f" stroke="#58a6ff" stroke-width="1"/>
+      <text x="130" y="385" text-anchor="middle" fill="#c9d1d9" font-size="9" font-weight="600">PF enp3s0f0</text>
+      <text x="130" y="400" text-anchor="middle" fill="#8b949e" font-size="8">consumes: slots = 9 (ALL)</text>
+
+      <rect x="250" y="365" width="140" height="50" rx="6" fill="#3f3f1f" stroke="#d29922" stroke-width="1.5"/>
+      <text x="320" y="383" text-anchor="middle" fill="#d29922" font-size="9" font-weight="600">pf0-counters</text>
+      <text x="320" y="400" text-anchor="middle" fill="#c9d1d9" font-size="8">exclusion-slots: 9</text>
+
+      <rect x="430" y="360" width="300" height="60" rx="6" fill="#1f3a5f" stroke="#79c0ff" stroke-width="1"/>
+      <text x="580" y="380" text-anchor="middle" fill="#c9d1d9" font-size="9" font-weight="600">VFs (enp3s0f0v0 – v7)</text>
+      <text x="580" y="397" text-anchor="middle" fill="#79c0ff" font-size="8">each consumes: slots = 1</text>
+      <text x="580" y="412" text-anchor="middle" fill="#8b949e" font-size="8">after 8 VFs allocated → PF can't get 9 → blocked</text>
+
+      <line x1="210" y1="390" x2="245" y2="390" stroke="#d29922" stroke-width="1.5" marker-end="url(#arrow7)"/>
+      <line x1="390" y1="390" x2="425" y2="390" stroke="#79c0ff" stroke-width="1.5" marker-end="url(#arrow7)"/>
+
+      <!-- Summary table reference -->
+      <text x="390" y="470" text-anchor="middle" fill="#8b949e" font-size="9">All three mechanisms produce the same effect: separate entries + shared counters → scheduling-time enforcement</text>
+    </svg>
+  </div>
+
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr><th>Conflict Type</th><th>Mechanism</th><th>Policy Field</th><th>Example</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>shared vs shared (macvlan vs ipvlan)</td><td>Cross-drain via <code>exclusionGroup</code></td><td><code>exclusionGroup: "rx-handler"</code></td><td>Example 4</td></tr>
+        <tr><td>shared vs exclusive (macvlan vs host-device)</td><td>Exclusive drains all counters</td><td><code>exclusive: true</code></td><td>Example 5</td></tr>
+        <tr><td>PF vs VFs (hardware)</td><td>Slot counter from sysfs</td><td>(automatic)</td><td>Example 6</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 id="why-not-single-device">3.2 Why Not Single-Device Cross-Consumption?</h3>
+
+  <p>Earlier iterations tried encoding exclusion on a <strong>single device</strong> by having each CNI plugin's <code>consumePerAllocation</code> drain the other's counter. This fails because DRA capacity consumption is <strong>per-allocation</strong>, not "per first allocation":</p>
+
+  <ul>
+    <li>1st macvlan consumes <code>macvlans: 1, ipvlans: 64</code> → ipvlans = 0. OK.</li>
+    <li>2nd macvlan consumes <code>macvlans: 1, ipvlans: 64</code> → but ipvlans is already 0. <strong>Fails.</strong></li>
+  </ul>
+
+  <div class="callout callout-success">
+    <div class="callout-title">Solution</div>
+    <p>The dual-device pattern avoids this because <code>consumesCounters</code> on a device with <code>allowMultipleAllocations: true</code> is charged <strong>once per device lifecycle</strong> (when the device first enters the allocated state), not per claim.</p>
+  </div>
+
+  <h3 id="consumes-counters-multi">3.3 How <code>consumesCounters</code> Works with <code>allowMultipleAllocations</code></h3>
+
+  <div class="flow-steps">
+    <div class="flow-step">
+      <div class="flow-step-num">1</div>
+      <div class="flow-step-content">Device <code>enp3s0f0-macvlan</code> has <code>allowMultipleAllocations: true</code> and <code>consumesCounters: ipvlan-capacity: 64</code></div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-step-num">2</div>
+      <div class="flow-step-content"><strong>First allocation:</strong> scheduler charges <code>ipvlan-capacity: 64</code> from shared set AND <code>macvlans: 1</code> from device capacity → ipvlan-capacity = 0, macvlans = 63</div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-step-num">3</div>
+      <div class="flow-step-content"><strong>Second allocation:</strong> scheduler charges only <code>macvlans: 1</code> from device capacity. The <code>consumesCounters</code> was already charged. → macvlans = 62</div>
+    </div>
+    <div class="flow-step">
+      <div class="flow-step-num">4</div>
+      <div class="flow-step-content"><strong>Ipvlan device attempts allocation:</strong> its <code>consumesCounters</code> needs <code>macvlan-capacity: 64</code> → blocked because macvlan already consumed the shared counter.</div>
+    </div>
+  </div>
+
+  <div class="callout callout-warning">
+    <div class="callout-title">Open Question</div>
+    <p>We need to verify that DRA's <code>consumesCounters</code> on a multi-alloc device is charged only once (on first allocation) vs per-allocation. If it's per-allocation, the dual-device pattern has the same problem as single-device cross-consumption.</p>
+  </div>
+
+  <h3 id="fallback">3.4 Fallback: Admin-Separated Policies</h3>
+
+  <p>If <code>consumesCounters</code> is per-allocation, the simplest correct approach: <strong>don't put conflicting CNI types on the same physical interface.</strong></p>
+
+  <div class="code-block">
+    <div class="code-header"><span class="lang-badge">YAML</span> Admin-separated (guaranteed correct)</div>
+    <div class="code-content"><span class="y-comment"># Policy for macvlan-mode PFs (e.g. PF1)</span>
+<span class="y-key">name</span>: <span class="y-str">pf1-macvlan</span>
+<span class="y-key">selector</span>:
+  <span class="y-key">cel</span>: <span class="y-str">device.attributes["dra.networking"].ifName == "enp3s0f1"</span>
+<span class="y-key">supportedCNIPlugins</span>: [{<span class="y-key">name</span>: <span class="y-str">macvlan</span>}]
+
+<span class="y-comment"># Policy for ipvlan-mode PFs (e.g. PF2)</span>
+<span class="y-key">name</span>: <span class="y-str">pf2-ipvlan</span>
+<span class="y-key">selector</span>:
+  <span class="y-key">cel</span>: <span class="y-str">device.attributes["dra.networking"].ifName == "enp3s0f2"</span>
+<span class="y-key">supportedCNIPlugins</span>: [{<span class="y-key">name</span>: <span class="y-str">ipvlan</span>}]</div>
+  </div>
+
+  <h3 id="exclusion-summary">3.5 Summary</h3>
+
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr><th>Approach</th><th>Enforcement</th><th>Works?</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>Dual-device with shared counters</strong></td><td>Scheduling time</td><td>Yes if <code>consumesCounters</code> is per-device-lifecycle</td></tr>
+        <tr><td><strong>Admin-separated policies</strong></td><td>N/A (conflict impossible)</td><td>Always works</td></tr>
+        <tr><td><strong>Driver-side check</strong></td><td>Prepare time (safety net)</td><td>Always works, but late failure</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout callout-idea">
+    <div class="callout-title">Recommendation</div>
+    <p>Design for dual-device pattern. Verify <code>consumesCounters</code> behavior with upstream. Use admin-separated policies as the guaranteed-correct fallback, with driver-side check as the universal safety net.</p>
+  </div>
+
+  <hr>
+
+  <!-- Section 4 -->
+  <h2 id="driver-uses-policies"><span class="section-num">4.</span> How the Driver Uses Policies</h2>
+
+  <p>The driver is a mechanical translator. It takes raw discovered attributes plus the winning <code>DeviceExposurePolicy</code> and produces a ResourceSlice device entry.</p>
+
+  <h3 id="attribute-translation">4.1 Attribute Translation</h3>
+
+  <p>The driver publishes every discovered attribute under the <code>dra.networking</code> domain:</p>
+
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr><th>Discovered Fact</th><th>ResourceSlice Attribute</th><th>Source</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Interface name</td><td><code>dra.networking/ifName</code></td><td><code>/sys/class/net/&lt;if&gt;</code></td></tr>
+        <tr><td>MAC address</td><td><code>dra.networking/mac</code></td><td>netlink</td></tr>
+        <tr><td>MTU</td><td><code>dra.networking/mtu</code></td><td><code>/sys/class/net/&lt;if&gt;/mtu</code></td></tr>
+        <tr><td>Link speed</td><td><code>dra.networking/linkSpeed</code></td><td><code>ethtool</code> (Mbps)</td></tr>
+        <tr><td>Operational state</td><td><code>dra.networking/operState</code></td><td>netlink</td></tr>
+        <tr><td>PCI BDF address</td><td><code>dra.networking/pciAddress</code></td><td>sysfs device symlink</td></tr>
+        <tr><td>NUMA node</td><td><code>dra.networking/numaNode</code></td><td>sysfs <code>numa_node</code></td></tr>
+        <tr><td>PCIe root complex</td><td><code>device.k8s.io/pcieRoot</code></td><td>PCI topology walk</td></tr>
+        <tr><td>PCI vendor ID</td><td><code>dra.networking/vendor</code></td><td>PCI config</td></tr>
+        <tr><td>PCI product ID</td><td><code>dra.networking/product</code></td><td>PCI config</td></tr>
+        <tr><td>Kernel driver</td><td><code>dra.networking/driver</code></td><td>sysfs driver symlink</td></tr>
+        <tr><td>Interface type</td><td><code>dra.networking/type</code></td><td>Classification (pf/vf/bridge/vlan/bond/nic)</td></tr>
+        <tr><td>RDMA capable</td><td><code>dra.networking/rdma</code></td><td><code>/sys/class/infiniband</code></td></tr>
+        <tr><td>SR-IOV capable</td><td><code>dra.networking/sriovCapable</code></td><td><code>sriov_totalvfs &gt; 0</code></td></tr>
+        <tr><td>Configured VF count</td><td><code>dra.networking/numVFs</code></td><td><code>sriov_numvfs</code></td></tr>
+        <tr><td>Parent PF name</td><td><code>dra.networking/pfName</code></td><td>sysfs <code>physfn</code></td></tr>
+        <tr><td>VF index</td><td><code>dra.networking/vfIndex</code></td><td>sysfs virtfn index</td></tr>
+        <tr><td>Bridge name</td><td><code>dra.networking/bridgeName</code></td><td>interface name (for bridges)</td></tr>
+        <tr><td>Bridge type</td><td><code>dra.networking/bridgeType</code></td><td><code>linux</code> or <code>ovs</code></td></tr>
+        <tr><td>VLAN filtering</td><td><code>dra.networking/vlanFiltering</code></td><td>sysfs <code>vlan_filtering</code></td></tr>
+        <tr><td>Master bridge</td><td><code>dra.networking/masterBridge</code></td><td>sysfs <code>master</code> symlink</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 id="policy-driven-fields">4.2 Policy-Driven Fields</h3>
+
+  <p>These ResourceSlice fields are set <strong>entirely</strong> from the <code>DeviceExposurePolicy</code>:</p>
+
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr><th>ResourceSlice Field</th><th>Source in Policy</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>allowMultipleAllocations</code></td><td><code>exposure.allowMultipleAllocations</code></td></tr>
+        <tr><td><code>capacity</code></td><td><code>exposure.capacity</code></td></tr>
+        <tr><td><code>dra.networking/supportedCNIs</code> attribute</td><td>Names from <code>exposure.supportedCNIPlugins[].name</code></td></tr>
+        <tr><td>Additional attributes</td><td><code>exposure.additionalAttributes</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3 id="shared-counters-auto">4.3 SharedCounters: Automatic from PF/VF Relationship</h3>
+
+  <p>The driver knows one structural fact: PF/VF parent-child relationships (from sysfs). When it discovers a PF with VFs, it <strong>automatically</strong> creates a shared counter set with <code>exclusion-slots = numVFs + 1</code>. The PF device consumes all slots; each VF consumes 1.</p>
+
+  <div class="callout callout-info">
+    <div class="callout-title">Note</div>
+    <p>This is the <strong>only</strong> CNI-independent knowledge the driver applies. It is a hardware fact (moving a PF destroys its VFs), not a CNI-specific fact. The policy can add additional shared counters (bandwidth, macvlan capacity). The driver merges them.</p>
+  </div>
+
+  <!-- Diagram 3: PF/VF Mutual Exclusion Slot Counter -->
+  <div class="diagram-container">
+    <div class="diagram-title">Diagram 3 — PF/VF Mutual Exclusion Slot Counter</div>
+    <svg width="700" height="340" viewBox="0 0 700 340" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="arrow3" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#58a6ff"/>
+        </marker>
+      </defs>
+
+      <!-- Shared counter set -->
+      <rect x="230" y="20" width="240" height="70" rx="8" fill="#161b22" stroke="#d29922" stroke-width="2"/>
+      <text x="350" y="42" text-anchor="middle" fill="#d29922" font-size="11" font-weight="600">pf0-counters (SharedCounterSet)</text>
+      <text x="350" y="62" text-anchor="middle" fill="#c9d1d9" font-size="10">exclusion-slots = 9</text>
+      <text x="350" y="78" text-anchor="middle" fill="#8b949e" font-size="9">(numVFs + 1 = 8 + 1)</text>
+
+      <!-- PF device -->
+      <rect x="50" y="130" width="180" height="70" rx="8" fill="#1f3a5f" stroke="#58a6ff" stroke-width="1.5"/>
+      <text x="140" y="152" text-anchor="middle" fill="#c9d1d9" font-size="11" font-weight="600">PF: enp3s0f0</text>
+      <text x="140" y="170" text-anchor="middle" fill="#79c0ff" font-size="9">consumesCounters:</text>
+      <text x="140" y="185" text-anchor="middle" fill="#f85149" font-size="10" font-weight="600">exclusion-slots: 9 (ALL)</text>
+
+      <!-- VF slots visualization -->
+      <rect x="280" y="130" width="380" height="70" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+      <text x="470" y="148" text-anchor="middle" fill="#8b949e" font-size="10">VFs: each consumes 1 slot</text>
+      <!-- Slot boxes -->
+      <rect x="295" y="158" width="35" height="30" rx="4" fill="#1f3a5f" stroke="#79c0ff" stroke-width="1"/>
+      <text x="312" y="177" text-anchor="middle" fill="#79c0ff" font-size="9">VF0</text>
+      <rect x="338" y="158" width="35" height="30" rx="4" fill="#1f3a5f" stroke="#79c0ff" stroke-width="1"/>
+      <text x="355" y="177" text-anchor="middle" fill="#79c0ff" font-size="9">VF1</text>
+      <rect x="381" y="158" width="35" height="30" rx="4" fill="#1f3a5f" stroke="#79c0ff" stroke-width="1"/>
+      <text x="398" y="177" text-anchor="middle" fill="#79c0ff" font-size="9">VF2</text>
+      <rect x="424" y="158" width="35" height="30" rx="4" fill="#1f3a5f" stroke="#79c0ff" stroke-width="1"/>
+      <text x="441" y="177" text-anchor="middle" fill="#79c0ff" font-size="9">VF3</text>
+      <rect x="467" y="158" width="35" height="30" rx="4" fill="#1f3a5f" stroke="#79c0ff" stroke-width="1"/>
+      <text x="484" y="177" text-anchor="middle" fill="#79c0ff" font-size="9">VF4</text>
+      <rect x="510" y="158" width="35" height="30" rx="4" fill="#1f3a5f" stroke="#79c0ff" stroke-width="1"/>
+      <text x="527" y="177" text-anchor="middle" fill="#79c0ff" font-size="9">VF5</text>
+      <rect x="553" y="158" width="35" height="30" rx="4" fill="#1f3a5f" stroke="#79c0ff" stroke-width="1"/>
+      <text x="570" y="177" text-anchor="middle" fill="#79c0ff" font-size="9">VF6</text>
+      <rect x="596" y="158" width="35" height="30" rx="4" fill="#1f3a5f" stroke="#79c0ff" stroke-width="1"/>
+      <text x="613" y="177" text-anchor="middle" fill="#79c0ff" font-size="9">VF7</text>
+
+      <!-- Arrows from counter set -->
+      <line x1="300" y1="90" x2="140" y2="125" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arrow3)"/>
+      <line x1="400" y1="90" x2="470" y2="125" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arrow3)"/>
+
+      <!-- Mutual exclusion explanation -->
+      <rect x="100" y="230" width="500" height="90" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+      <text x="350" y="252" text-anchor="middle" fill="#d29922" font-size="10" font-weight="600">MUTUAL EXCLUSION LOGIC</text>
+      <text x="350" y="272" text-anchor="middle" fill="#c9d1d9" font-size="10">PF passthrough consumes 9 slots → blocks ALL 8 VFs</text>
+      <text x="350" y="290" text-anchor="middle" fill="#c9d1d9" font-size="10">Each VF consumes 1 slot → after 8 VFs, PF cannot get 9</text>
+      <text x="350" y="308" text-anchor="middle" fill="#8b949e" font-size="9">Hardware fact: moving a PF destroys its VFs</text>
+    </svg>
+  </div>
+
+  <h3 id="translation-algorithm">4.4 Translation Algorithm</h3>
+
+  <!-- Diagram 4: Translation Algorithm Flow -->
+  <div class="diagram-container">
+    <div class="diagram-title">Diagram 4 — Translation Algorithm Flow</div>
+    <svg width="780" height="520" viewBox="0 0 780 520" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="arrow4" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#58a6ff"/>
+        </marker>
+        <marker id="arrow4g" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#3fb950"/>
+        </marker>
+      </defs>
+
+      <!-- Phase headers -->
+      <rect x="20" y="15" width="740" height="25" rx="4" fill="#1f6feb" opacity="0.3"/>
+      <text x="390" y="32" text-anchor="middle" fill="#58a6ff" font-size="11" font-weight="700">PHASE 1: Policy Resolution</text>
+
+      <!-- Steps -->
+      <rect x="60" y="50" width="300" height="35" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+      <text x="210" y="72" text-anchor="middle" fill="#c9d1d9" font-size="10">1-4. Collect, filter, group by suffix</text>
+
+      <rect x="420" y="50" width="300" height="35" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+      <text x="570" y="72" text-anchor="middle" fill="#c9d1d9" font-size="10">Result: set of winning policies</text>
+
+      <line x1="360" y1="67" x2="415" y2="67" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arrow4)"/>
+
+      <!-- Phase 2 -->
+      <rect x="20" y="100" width="740" height="25" rx="4" fill="#238636" opacity="0.3"/>
+      <text x="390" y="117" text-anchor="middle" fill="#3fb950" font-size="11" font-weight="700">PHASE 2: Build Shared Counter Set</text>
+
+      <rect x="60" y="135" width="220" height="50" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+      <text x="170" y="155" text-anchor="middle" fill="#c9d1d9" font-size="9">5. Create counter set</text>
+      <text x="170" y="170" text-anchor="middle" fill="#8b949e" font-size="9">"&lt;ifName&gt;-counters"</text>
+
+      <rect x="300" y="135" width="200" height="50" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+      <text x="400" y="155" text-anchor="middle" fill="#c9d1d9" font-size="9">6. PF/VF auto-mutex</text>
+      <text x="400" y="170" text-anchor="middle" fill="#8b949e" font-size="9">exclusion-slots = numVFs+1</text>
+
+      <rect x="520" y="135" width="200" height="50" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+      <text x="620" y="155" text-anchor="middle" fill="#c9d1d9" font-size="9">7-8. Bandwidth + Mirroring</text>
+      <text x="620" y="170" text-anchor="middle" fill="#8b949e" font-size="9">capacity → shared counters</text>
+
+      <line x1="280" y1="160" x2="295" y2="160" stroke="#3fb950" stroke-width="1.5" marker-end="url(#arrow4g)"/>
+      <line x1="500" y1="160" x2="515" y2="160" stroke="#3fb950" stroke-width="1.5" marker-end="url(#arrow4g)"/>
+
+      <!-- Phase 3 -->
+      <rect x="20" y="200" width="740" height="25" rx="4" fill="#9e6a03" opacity="0.3"/>
+      <text x="390" y="217" text-anchor="middle" fill="#d29922" font-size="11" font-weight="700">PHASE 3: Build Device Entries</text>
+
+      <rect x="60" y="235" width="320" height="55" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+      <text x="220" y="252" text-anchor="middle" fill="#c9d1d9" font-size="9" font-weight="600">For each winning policy P:</text>
+      <text x="220" y="267" text-anchor="middle" fill="#c9d1d9" font-size="9">9. name = ifName + suffix</text>
+      <text x="220" y="282" text-anchor="middle" fill="#c9d1d9" font-size="9">   attrs = raw + additional + supportedCNIs</text>
+
+      <rect x="420" y="235" width="140" height="55" rx="6" fill="#1f3f2a" stroke="#3fb950" stroke-width="1"/>
+      <text x="490" y="255" text-anchor="middle" fill="#3fb950" font-size="9" font-weight="600">Multi-alloc?</text>
+      <text x="490" y="270" text-anchor="middle" fill="#c9d1d9" font-size="9">10. capacity +</text>
+      <text x="490" y="283" text-anchor="middle" fill="#c9d1d9" font-size="9">exclusionGroup drain</text>
+
+      <rect x="590" y="235" width="140" height="55" rx="6" fill="#3f1f1f" stroke="#f85149" stroke-width="1"/>
+      <text x="660" y="255" text-anchor="middle" fill="#f85149" font-size="9" font-weight="600">Exclusive?</text>
+      <text x="660" y="270" text-anchor="middle" fill="#c9d1d9" font-size="9">11. drain ALL</text>
+      <text x="660" y="283" text-anchor="middle" fill="#c9d1d9" font-size="9">shared counters</text>
+
+      <line x1="380" y1="262" x2="415" y2="262" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arrow4)"/>
+
+      <!-- Phase 4 -->
+      <rect x="20" y="310" width="740" height="25" rx="4" fill="#1f3a5f" opacity="0.4"/>
+      <text x="390" y="327" text-anchor="middle" fill="#79c0ff" font-size="11" font-weight="700">PHASE 4: VF Device Entries</text>
+
+      <rect x="60" y="345" width="660" height="45" rx="6" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+      <text x="390" y="365" text-anchor="middle" fill="#c9d1d9" font-size="10">12. For each VF of D: find matching policy → create entry with consumesCounters from parent PF's counter set</text>
+      <text x="390" y="380" text-anchor="middle" fill="#8b949e" font-size="9">exclusion-slots: 1, bandwidth: valueFrom</text>
+
+      <!-- Phase 5 -->
+      <rect x="20" y="405" width="740" height="25" rx="4" fill="#1f3f2a" opacity="0.4"/>
+      <text x="390" y="422" text-anchor="middle" fill="#3fb950" font-size="11" font-weight="700">PHASE 5: Publish</text>
+
+      <rect x="200" y="440" width="380" height="50" rx="8" fill="#1f3f2a" stroke="#3fb950" stroke-width="1.5"/>
+      <text x="390" y="460" text-anchor="middle" fill="#3fb950" font-size="11" font-weight="600">ResourceSlice Published</text>
+      <text x="390" y="478" text-anchor="middle" fill="#c9d1d9" font-size="9">One pool per PF, one pool per standalone device</text>
+    </svg>
+  </div>
+
+  <div class="callout callout-info">
+    <div class="callout-title">Rule</div>
+    <p>One device entry per policy, one policy per allocation semantic. A physical interface that supports both shared and exclusive access gets separate policies with different <code>deviceNameSuffix</code> values. Each policy produces one device entry. All entries for the same physical interface share a counter set.</p>
+  </div>
+
+  <hr>
+
+  <!-- Section 5 -->
+  <h2 id="examples"><span class="section-num">5.</span> Examples</h2>
+
+  <p>Each example shows: the admin's <code>DeviceExposurePolicy</code>, the resulting ResourceSlice device entry the driver publishes, and an explanation of how the policy fields map to ResourceSlice fields.</p>
+
+  <h3 id="example-1">5.1 Example 1: Simple SR-IOV VFs <span class="badge badge-sriov">SR-IOV</span></h3>
+
+  <p><strong>Scenario:</strong> VFs on <code>enp3s0f0</code> for <code>sriov</code> CNI only. Each VF is exclusively allocated to one pod.</p>
+
+  <h4>DeviceExposurePolicy</h4>
+
+  <div class="code-block">
+    <div class="code-header"><span class="lang-badge">YAML</span> sriov-vfs-pf0</div>
+    <div class="code-content"><span class="y-key">apiVersion</span>: <span class="y-str">networking.dra.io/v1alpha1</span>
+<span class="y-key">kind</span>: <span class="y-str">DeviceExposurePolicy</span>
+<span class="y-key">metadata</span>:
+  <span class="y-key">name</span>: <span class="y-str">sriov-vfs-pf0</span>
+<span class="y-key">spec</span>:
+  <span class="y-key">priority</span>: <span class="y-num">200</span>
+  <span class="y-key">selector</span>:
+    <span class="y-key">cel</span>: <span class="y-str">&gt;-
+      device.attributes["dra.networking"].type == "vf" &amp;&amp;
+      device.attributes["dra.networking"].pfName == "enp3s0f0"</span>
+  <span class="y-key">action</span>: <span class="y-str">expose</span>
+  <span class="y-key">exposure</span>:
+    <span class="y-key">allowMultipleAllocations</span>: <span class="y-bool">false</span>
+    <span class="y-key">supportedCNIPlugins</span>:
+      - <span class="y-key">name</span>: <span class="y-str">sriov</span>
+        <span class="y-key">exclusive</span>: <span class="y-bool">true</span></div>
+  </div>
+
+  <h4>Resulting ResourceSlice Device Entry</h4>
+
+  <div class="code-block">
+    <div class="code-header"><span class="lang-badge">YAML</span> ResourceSlice device entry</div>
+    <div class="code-content">- <span class="y-key">name</span>: <span class="y-str">enp3s0f0v0</span>
+  <span class="y-key">basic</span>:
+    <span class="y-key">attributes</span>:
+      <span class="y-key">dra.networking/type</span>:
+        <span class="y-key">string</span>: <span class="y-str">"vf"</span>
+      <span class="y-key">dra.networking/ifName</span>:
+        <span class="y-key">string</span>: <span class="y-str">"enp3s0f0v0"</span>
+      <span class="y-key">dra.networking/pfName</span>:
+        <span class="y-key">string</span>: <span class="y-str">"enp3s0f0"</span>
+      <span class="y-key">dra.networking/vfIndex</span>:
+        <span class="y-key">int</span>: <span class="y-num">0</span>
+      <span class="y-key">dra.networking/pciAddress</span>:
+        <span class="y-key">string</span>: <span class="y-str">"0000:03:00.2"</span>
+      <span class="y-key">dra.networking/numaNode</span>:
+        <span class="y-key">int</span>: <span class="y-num">0</span>
+      <span class="y-key">dra.networking/rdma</span>:
+        <span class="y-key">bool</span>: <span class="y-bool">true</span>
+      <span class="y-key">dra.networking/supportedCNIs</span>:
+        <span class="y-key">stringSlice</span>:
+          - <span class="y-str">sriov</span>
+  <span class="y-key">consumesCounters</span>:
+    - <span class="y-key">counterSet</span>: <span class="y-str">pf0-counters</span>
+      <span class="y-key">counters</span>:
+        <span class="y-key">exclusion-slots</span>:
+          <span class="y-key">value</span>: <span class="y-num">1</span></div>
+  </div>
+
+  <p><strong>Explanation:</strong> All plugins are exclusive → single device entry, no multi-alloc. The <code>exclusion-slots</code> shared counter comes from the driver's automatic PF/VF relationship detection, not from the <code>exclusive</code> flag.</p>
+
+  <hr>
+
+  <h3 id="example-2">5.2 Example 2: SR-IOV VFs with Multiple CNI Options <span class="badge badge-sriov">SR-IOV</span> <span class="badge badge-nic">NIC</span></h3>
+
+  <p><strong>Scenario:</strong> VFs support both <code>sriov</code> and <code>host-device</code>. Both are exclusive.</p>
+
+  <div class="code-block">
+    <div class="code-header"><span class="lang-badge">YAML</span> sriov-vfs-multi-cni</div>
+    <div class="code-content"><span class="y-key">apiVersion</span>: <span class="y-str">networking.dra.io/v1alpha1</span>
+<span class="y-key">kind</span>: <span class="y-str">DeviceExposurePolicy</span>
+<span class="y-key">metadata</span>:
+  <span class="y-key">name</span>: <span class="y-str">sriov-vfs-multi-cni</span>
+<span class="y-key">spec</span>:
+  <span class="y-key">priority</span>: <span class="y-num">200</span>
+  <span class="y-key">selector</span>:
+    <span class="y-key">cel</span>: <span class="y-str">&gt;-
+      device.attributes["dra.networking"].type == "vf" &amp;&amp;
+      device.attributes["dra.networking"].pfName == "enp3s0f0"</span>
+  <span class="y-key">action</span>: <span class="y-str">expose</span>
+  <span class="y-key">exposure</span>:
+    <span class="y-key">allowMultipleAllocations</span>: <span class="y-bool">false</span>
+    <span class="y-key">supportedCNIPlugins</span>:
+      - <span class="y-key">name</span>: <span class="y-str">sriov</span>
+        <span class="y-key">exclusive</span>: <span class="y-bool">true</span>
+      - <span class="y-key">name</span>: <span class="y-str">host-device</span>
+        <span class="y-key">exclusive</span>: <span class="y-bool">true</span></div>
+  </div>
+
+  <p><strong>Explanation:</strong> Both plugins are <code>exclusive: true</code> → <code>allowMultipleAllocations</code> stays <code>false</code>. The device can be claimed for either <code>sriov</code> or <code>host-device</code>, but not both simultaneously. The choice is made in the NetworkTopology root step's <code>type</code> field.</p>
+
+  <hr>
+
+  <h3 id="example-3">5.3 Example 3: PF as Macvlan Parent <span class="badge badge-nic">NIC</span></h3>
+
+  <p><strong>Scenario:</strong> PF <code>enp3s0f1</code> is used as a macvlan parent. Multiple pods share the PF — each gets a macvlan sub-interface. Capacity: 64 macvlans.</p>
+
+  <div class="code-block">
+    <div class="code-header"><span class="lang-badge">YAML</span> pf1-macvlan-parent</div>
+    <div class="code-content"><span class="y-key">apiVersion</span>: <span class="y-str">networking.dra.io/v1alpha1</span>
+<span class="y-key">kind</span>: <span class="y-str">DeviceExposurePolicy</span>
+<span class="y-key">metadata</span>:
+  <span class="y-key">name</span>: <span class="y-str">pf1-macvlan-parent</span>
+<span class="y-key">spec</span>:
+  <span class="y-key">priority</span>: <span class="y-num">200</span>
+  <span class="y-key">selector</span>:
+    <span class="y-key">cel</span>: <span class="y-str">&gt;-
+      device.attributes["dra.networking"].type == "pf" &amp;&amp;
+      device.attributes["dra.networking"].ifName == "enp3s0f1"</span>
+  <span class="y-key">action</span>: <span class="y-str">expose</span>
+  <span class="y-key">exposure</span>:
+    <span class="y-key">allowMultipleAllocations</span>: <span class="y-bool">true</span>
+    <span class="y-key">capacity</span>:
+      <span class="y-key">macvlans</span>:
+        <span class="y-key">value</span>: <span class="y-str">"64"</span>
+        <span class="y-key">requestPolicy</span>:
+          <span class="y-key">default</span>: <span class="y-str">"1"</span>
+          <span class="y-key">validRange</span>:
+            <span class="y-key">min</span>: <span class="y-str">"1"</span>
+            <span class="y-key">max</span>: <span class="y-str">"4"</span>
+            <span class="y-key">step</span>: <span class="y-str">"1"</span>
+    <span class="y-key">supportedCNIPlugins</span>:
+      - <span class="y-key">name</span>: <span class="y-str">macvlan</span>
+        <span class="y-key">exclusive</span>: <span class="y-bool">false</span>
+        <span class="y-key">consumePerAllocation</span>:
+          <span class="y-key">macvlans</span>: <span class="y-num">1</span></div>
+  </div>
+
+  <p><strong>Explanation:</strong> <code>allowMultipleAllocations: true</code> → the PF can be allocated to multiple pods simultaneously. <code>capacity.macvlans: 64</code> → the scheduler tracks consumption. The driver doesn't know what a macvlan is — it copies these fields verbatim.</p>
+
+  <hr>
+
+  <h3 id="example-4">5.4 Example 4: PF with Macvlan AND Ipvlan (Exclusion Group) <span class="badge badge-nic">NIC</span></h3>
+
+  <p><strong>Scenario:</strong> PF <code>enp3s0f1</code> supports both <code>macvlan</code> and <code>ipvlan</code>. The kernel's <code>rx_handler</code> allows only one type at a time. Solution: Two device entries with shared counter.</p>
+
+  <div class="code-block">
+    <div class="code-header"><span class="lang-badge">YAML</span> pf1-macvlan (exclusionGroup: rx-handler)</div>
+    <div class="code-content"><span class="y-key">apiVersion</span>: <span class="y-str">networking.dra.io/v1alpha1</span>
+<span class="y-key">kind</span>: <span class="y-str">DeviceExposurePolicy</span>
+<span class="y-key">metadata</span>:
+  <span class="y-key">name</span>: <span class="y-str">pf1-macvlan</span>
+<span class="y-key">spec</span>:
+  <span class="y-key">priority</span>: <span class="y-num">200</span>
+  <span class="y-key">selector</span>:
+    <span class="y-key">cel</span>: <span class="y-str">&gt;-
+      device.attributes["dra.networking"].type == "pf" &amp;&amp;
+      device.attributes["dra.networking"].ifName == "enp3s0f1"</span>
+  <span class="y-key">action</span>: <span class="y-str">expose</span>
+  <span class="y-key">exposure</span>:
+    <span class="y-key">deviceNameSuffix</span>: <span class="y-str">"-macvlan"</span>
+    <span class="y-key">exclusionGroup</span>: <span class="y-str">"rx-handler"</span>       <span class="y-comment"># ← links to pf1-ipvlan</span>
+    <span class="y-key">allowMultipleAllocations</span>: <span class="y-bool">true</span>
+    <span class="y-key">capacity</span>:
+      <span class="y-key">macvlans</span>:
+        <span class="y-key">value</span>: <span class="y-str">"64"</span>
+    <span class="y-key">supportedCNIPlugins</span>:
+      - <span class="y-key">name</span>: <span class="y-str">macvlan</span>
+        <span class="y-key">exclusive</span>: <span class="y-bool">false</span>
+        <span class="y-key">consumePerAllocation</span>:
+          <span class="y-key">macvlans</span>: <span class="y-num">1</span></div>
+  </div>
+
+  <div class="code-block">
+    <div class="code-header"><span class="lang-badge">YAML</span> pf1-ipvlan (exclusionGroup: rx-handler)</div>
+    <div class="code-content"><span class="y-key">apiVersion</span>: <span class="y-str">networking.dra.io/v1alpha1</span>
+<span class="y-key">kind</span>: <span class="y-str">DeviceExposurePolicy</span>
+<span class="y-key">metadata</span>:
+  <span class="y-key">name</span>: <span class="y-str">pf1-ipvlan</span>
+<span class="y-key">spec</span>:
+  <span class="y-key">priority</span>: <span class="y-num">200</span>
+  <span class="y-key">selector</span>:
+    <span class="y-key">cel</span>: <span class="y-str">&gt;-
+      device.attributes["dra.networking"].type == "pf" &amp;&amp;
+      device.attributes["dra.networking"].ifName == "enp3s0f1"</span>
+  <span class="y-key">action</span>: <span class="y-str">expose</span>
+  <span class="y-key">exposure</span>:
+    <span class="y-key">deviceNameSuffix</span>: <span class="y-str">"-ipvlan"</span>
+    <span class="y-key">exclusionGroup</span>: <span class="y-str">"rx-handler"</span>       <span class="y-comment"># ← links to pf1-macvlan</span>
+    <span class="y-key">allowMultipleAllocations</span>: <span class="y-bool">true</span>
+    <span class="y-key">capacity</span>:
+      <span class="y-key">ipvlans</span>:
+        <span class="y-key">value</span>: <span class="y-str">"64"</span>
+    <span class="y-key">supportedCNIPlugins</span>:
+      - <span class="y-key">name</span>: <span class="y-str">ipvlan</span>
+        <span class="y-key">exclusive</span>: <span class="y-bool">false</span>
+        <span class="y-key">consumePerAllocation</span>:
+          <span class="y-key">ipvlans</span>: <span class="y-num">1</span></div>
+  </div>
+
+  <h4>Walkthrough</h4>
+
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr><th>Event</th><th>macvlan-capacity (shared)</th><th>ipvlan-capacity (shared)</th><th>macvlan device cap</th><th>ipvlan device cap</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Initial</td><td>64</td><td>64</td><td>64</td><td>64</td></tr>
+        <tr><td>1st macvlan allocated</td><td>64</td><td><strong>0</strong> (drained)</td><td>63</td><td>64</td></tr>
+        <tr><td>2nd macvlan allocated</td><td>64</td><td>0</td><td>62</td><td>64</td></tr>
+        <tr><td>ipvlan attempted</td><td colspan="4">ipvlan-capacity=0 → <strong>blocked</strong></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <hr>
+
+  <h3 id="example-5">5.5 Example 5: PF with Macvlan AND Host-Device Passthrough <span class="badge badge-nic">NIC</span> <span class="badge badge-sriov">SR-IOV</span></h3>
+
+  <p><strong>Scenario:</strong> PF <code>enp3s0f0</code> supports both <code>macvlan</code> (shared) and <code>host-device</code> (exclusive). Two device entries with shared counters.</p>
+
+  <!-- Diagram 5: Dual-Device Pattern for Exclusion -->
+  <div class="diagram-container">
+    <div class="diagram-title">Diagram 5 — Dual-Device Pattern: Macvlan vs Host-Device Passthrough</div>
+    <svg width="750" height="300" viewBox="0 0 750 300" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="arrow5" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#58a6ff"/>
+        </marker>
+        <marker id="arrow5r" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#f85149"/>
+        </marker>
+      </defs>
+
+      <!-- Macvlan device -->
+      <rect x="30" y="40" width="240" height="120" rx="8" fill="#1f3a5f" stroke="#58a6ff" stroke-width="1.5"/>
+      <text x="150" y="62" text-anchor="middle" fill="#58a6ff" font-size="10" font-weight="600">enp3s0f0-macvlan</text>
+      <text x="150" y="82" text-anchor="middle" fill="#c9d1d9" font-size="9">allowMultipleAllocations: true</text>
+      <text x="150" y="100" text-anchor="middle" fill="#c9d1d9" font-size="9">capacity: macvlans = 64</text>
+      <text x="150" y="118" text-anchor="middle" fill="#79c0ff" font-size="9">supportedCNIs: [macvlan]</text>
+      <text x="150" y="145" text-anchor="middle" fill="#8b949e" font-size="8">Per-alloc: macvlans -1 (from device cap)</text>
+
+      <!-- Shared counter set -->
+      <rect x="300" y="60" width="150" height="80" rx="8" fill="#3f3f1f" stroke="#d29922" stroke-width="2"/>
+      <text x="375" y="80" text-anchor="middle" fill="#d29922" font-size="10" font-weight="600">SharedCounters</text>
+      <text x="375" y="100" text-anchor="middle" fill="#c9d1d9" font-size="9">pf0-counters</text>
+      <text x="375" y="118" text-anchor="middle" fill="#c9d1d9" font-size="9">macvlan-capacity: 64</text>
+      <text x="375" y="132" text-anchor="middle" fill="#8b949e" font-size="8">(mirrored from device)</text>
+
+      <!-- Passthrough device -->
+      <rect x="480" y="40" width="240" height="120" rx="8" fill="#3f1f1f" stroke="#f85149" stroke-width="1.5"/>
+      <text x="600" y="62" text-anchor="middle" fill="#f85149" font-size="10" font-weight="600">enp3s0f0-passthrough</text>
+      <text x="600" y="82" text-anchor="middle" fill="#c9d1d9" font-size="9">exclusive (normal device)</text>
+      <text x="600" y="100" text-anchor="middle" fill="#c9d1d9" font-size="9">consumesCounters:</text>
+      <text x="600" y="118" text-anchor="middle" fill="#f85149" font-size="9" font-weight="600">macvlan-capacity: 64 (ALL)</text>
+      <text x="600" y="145" text-anchor="middle" fill="#79c0ff" font-size="9">supportedCNIs: [host-device]</text>
+
+      <!-- Arrows -->
+      <line x1="270" y1="100" x2="295" y2="100" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arrow5)"/>
+      <line x1="450" y1="100" x2="475" y2="100" stroke="#f85149" stroke-width="1.5" marker-end="url(#arrow5r)"/>
+
+      <!-- Explanation -->
+      <rect x="80" y="195" width="590" height="80" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+      <text x="375" y="218" text-anchor="middle" fill="#d29922" font-size="10" font-weight="600">MUTUAL EXCLUSION</text>
+      <text x="375" y="238" text-anchor="middle" fill="#c9d1d9" font-size="9">• Passthrough allocated → consumes macvlan-capacity: 64 → blocks ALL macvlans</text>
+      <text x="375" y="255" text-anchor="middle" fill="#c9d1d9" font-size="9">• Any macvlan allocated → shared counter &lt; 64 → passthrough can't get 64 → blocked</text>
+      <text x="375" y="272" text-anchor="middle" fill="#8b949e" font-size="8">Same physical PF attributes on both entries (PCI, NUMA, etc.) — matchAttribute constraints still work</text>
+    </svg>
+  </div>
+
+  <div class="code-block">
+    <div class="code-header"><span class="lang-badge">YAML</span> pf0-macvlan + pf0-passthrough policies</div>
+    <div class="code-content"><span class="y-comment"># Macvlan persona</span>
+<span class="y-key">name</span>: <span class="y-str">pf0-macvlan</span>
+<span class="y-key">exposure</span>:
+  <span class="y-key">deviceNameSuffix</span>: <span class="y-str">"-macvlan"</span>
+  <span class="y-key">allowMultipleAllocations</span>: <span class="y-bool">true</span>
+  <span class="y-key">capacity</span>:
+    <span class="y-key">macvlans</span>: { <span class="y-key">value</span>: <span class="y-str">"64"</span> }
+  <span class="y-key">supportedCNIPlugins</span>:
+    - <span class="y-key">name</span>: <span class="y-str">macvlan</span>
+      <span class="y-key">exclusive</span>: <span class="y-bool">false</span>
+---
+<span class="y-comment"># Passthrough persona</span>
+<span class="y-key">name</span>: <span class="y-str">pf0-passthrough</span>
+<span class="y-key">exposure</span>:
+  <span class="y-key">deviceNameSuffix</span>: <span class="y-str">"-passthrough"</span>
+  <span class="y-key">allowMultipleAllocations</span>: <span class="y-bool">false</span>
+  <span class="y-key">supportedCNIPlugins</span>:
+    - <span class="y-key">name</span>: <span class="y-str">host-device</span>
+      <span class="y-key">exclusive</span>: <span class="y-bool">true</span></div>
+  </div>
+
+  <hr>
+
+  <h3 id="example-6">5.6 Example 6: PF with VFs + Macvlan + Host-Device <span class="badge badge-sriov">SR-IOV</span> <span class="badge badge-nic">NIC</span></h3>
+
+  <p><strong>Scenario:</strong> The most complex case. PF <code>enp3s0f0</code> has 8 VFs and also serves as a macvlan parent. The PF can also be passthrough'd, which blocks <strong>both</strong> VFs and macvlans. Three policies needed.</p>
+
+  <div class="code-block">
+    <div class="code-header"><span class="lang-badge">YAML</span> Resulting ResourceSlice (PF personas + VFs)</div>
+    <div class="code-content"><span class="y-key">sharedCounters</span>:
+  - <span class="y-key">name</span>: <span class="y-str">pf0-counters</span>
+    <span class="y-key">counters</span>:
+      <span class="y-key">exclusion-slots</span>:
+        <span class="y-key">value</span>: <span class="y-num">9</span>               <span class="y-comment"># 8 VFs + 1 (automatic)</span>
+      <span class="y-key">bandwidth</span>:
+        <span class="y-key">value</span>: <span class="y-num">100000</span>          <span class="y-comment"># 100 Gbps</span>
+      <span class="y-key">macvlan-capacity</span>:
+        <span class="y-key">value</span>: <span class="y-num">64</span>              <span class="y-comment"># from macvlan policy</span>
+
+<span class="y-key">devices</span>:
+  <span class="y-comment"># ── PF macvlan persona: multi-allocatable ──</span>
+  - <span class="y-key">name</span>: <span class="y-str">enp3s0f0-macvlan</span>
+    <span class="y-key">allowMultipleAllocations</span>: <span class="y-bool">true</span>
+    <span class="y-key">basic</span>:
+      <span class="y-key">attributes</span>:
+        <span class="y-key">dra.networking/supportedCNIs</span>: { <span class="y-key">stringSlice</span>: [<span class="y-str">macvlan</span>] }
+      <span class="y-key">capacity</span>:
+        <span class="y-key">dra.networking/macvlans</span>: { <span class="y-key">value</span>: <span class="y-str">"64"</span> }
+
+  <span class="y-comment"># ── PF passthrough persona: exclusive, drains everything ──</span>
+  - <span class="y-key">name</span>: <span class="y-str">enp3s0f0-passthrough</span>
+    <span class="y-key">consumesCounters</span>:
+      - <span class="y-key">counterSet</span>: <span class="y-str">pf0-counters</span>
+        <span class="y-key">counters</span>:
+          <span class="y-key">exclusion-slots</span>: { <span class="y-key">value</span>: <span class="y-num">9</span> }       <span class="y-comment"># blocks all VFs</span>
+          <span class="y-key">bandwidth</span>: { <span class="y-key">value</span>: <span class="y-num">100000</span> }         <span class="y-comment"># takes all bandwidth</span>
+          <span class="y-key">macvlan-capacity</span>: { <span class="y-key">value</span>: <span class="y-num">64</span> }      <span class="y-comment"># blocks all macvlans</span>
+
+  <span class="y-comment"># ── VF 0: exclusive ──</span>
+  - <span class="y-key">name</span>: <span class="y-str">enp3s0f0v0</span>
+    <span class="y-key">consumesCounters</span>:
+      - <span class="y-key">counterSet</span>: <span class="y-str">pf0-counters</span>
+        <span class="y-key">counters</span>:
+          <span class="y-key">exclusion-slots</span>: { <span class="y-key">value</span>: <span class="y-num">1</span> }
+          <span class="y-key">bandwidth</span>:
+            <span class="y-key">valueFrom</span>: { <span class="y-key">capacityKey</span>: <span class="y-str">"dra.networking/bandwidth"</span> }</div>
+  </div>
+
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr><th>Counter</th><th>Purpose</th><th>PF-passthrough</th><th>VF consumption</th><th>Macvlan</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>exclusion-slots</code></td><td>PF/VF mutual exclusion</td><td>9 (all)</td><td>1</td><td>0</td></tr>
+        <tr><td><code>bandwidth</code></td><td>Shared link bandwidth</td><td>100000 (all)</td><td><code>valueFrom</code></td><td>0</td></tr>
+        <tr><td><code>macvlan-capacity</code></td><td>Macvlan slot limit</td><td>64 (all)</td><td>0</td><td>1 (via device cap)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="callout callout-warning">
+    <div class="callout-title">Key Principle</div>
+    <p>Never mix <code>allowMultipleAllocations: true</code> (shared) and exclusive semantics on a single device entry. Use separate device entries with shared counters for mutual exclusion.</p>
+  </div>
+
+  <hr>
+
+  <h3 id="example-7">5.7 Example 7: VF as Bridge Port OR SR-IOV <span class="badge badge-sriov">SR-IOV</span></h3>
+
+  <p><strong>Scenario:</strong> A VF can be used in two ways: (a) <code>sriov</code> moves it to a pod (exclusive), or (b) <code>bridge</code> — the VF is pre-enslaved to a host bridge (shared). Three policies: free VFs (expose), bridge-slave VFs (exclude), bridge itself (expose).</p>
+
+  <div class="code-block">
+    <div class="code-header"><span class="lang-badge">YAML</span> Bridge-slave VFs hidden; bridge exposed</div>
+    <div class="code-content"><span class="y-comment"># Exclude VFs enslaved to a bridge</span>
+<span class="y-key">name</span>: <span class="y-str">exclude-bridge-slave-vfs</span>
+<span class="y-key">priority</span>: <span class="y-num">900</span>
+<span class="y-key">selector</span>:
+  <span class="y-key">cel</span>: <span class="y-str">&gt;-
+    device.attributes["dra.networking"].type == "vf" &amp;&amp;
+    device.attributes["dra.networking"].masterBridge != ""</span>
+<span class="y-key">action</span>: <span class="y-str">exclude</span>
+---
+<span class="y-comment"># The bridge is the allocatable device</span>
+<span class="y-key">name</span>: <span class="y-str">bridge-sriov-data</span>
+<span class="y-key">selector</span>:
+  <span class="y-key">cel</span>: <span class="y-str">&gt;-
+    device.attributes["dra.networking"].type == "bridge" &amp;&amp;
+    device.attributes["dra.networking"].ifName == "br-sriov-data"</span>
+<span class="y-key">exposure</span>:
+  <span class="y-key">allowMultipleAllocations</span>: <span class="y-bool">true</span>
+  <span class="y-key">capacity</span>:
+    <span class="y-key">ports</span>: { <span class="y-key">value</span>: <span class="y-str">"64"</span> }
+  <span class="y-key">supportedCNIPlugins</span>:
+    - <span class="y-key">name</span>: <span class="y-str">bridge</span></div>
+  </div>
+
+  <hr>
+
+  <h3 id="example-8">5.8 Example 8: Excluding Cluster CNI Interfaces</h3>
+
+  <p><strong>Scenario:</strong> OVN-Kubernetes and management interfaces must never be exposed to workloads.</p>
+
+  <div class="code-block">
+    <div class="code-header"><span class="lang-badge">YAML</span> Exclusion policies</div>
+    <div class="code-content"><span class="y-comment"># Exclude OVN-K infrastructure</span>
+<span class="y-key">apiVersion</span>: <span class="y-str">networking.dra.io/v1alpha1</span>
+<span class="y-key">kind</span>: <span class="y-str">DeviceExposurePolicy</span>
+<span class="y-key">metadata</span>:
+  <span class="y-key">name</span>: <span class="y-str">exclude-ovn-k</span>
+<span class="y-key">spec</span>:
+  <span class="y-key">priority</span>: <span class="y-num">1000</span>
+  <span class="y-key">selector</span>:
+    <span class="y-key">cel</span>: <span class="y-str">&gt;-
+      device.attributes["dra.networking"].ifName in
+      ["br-int", "ovn-k8s-mp0", "breth0", "ovn-k8s-gw0"]</span>
+  <span class="y-key">action</span>: <span class="y-str">exclude</span>
+---
+<span class="y-comment"># Exclude management NIC</span>
+<span class="y-key">apiVersion</span>: <span class="y-str">networking.dra.io/v1alpha1</span>
+<span class="y-key">kind</span>: <span class="y-str">DeviceExposurePolicy</span>
+<span class="y-key">metadata</span>:
+  <span class="y-key">name</span>: <span class="y-str">exclude-management</span>
+<span class="y-key">spec</span>:
+  <span class="y-key">priority</span>: <span class="y-num">1000</span>
+  <span class="y-key">selector</span>:
+    <span class="y-key">cel</span>: <span class="y-str">&gt;-
+      device.attributes["dra.networking"].ifName == "eno1"</span>
+  <span class="y-key">action</span>: <span class="y-str">exclude</span></div>
+  </div>
+
+  <div class="callout callout-info">
+    <div class="callout-title">Note</div>
+    <p><code>action: exclude</code> <strong>always wins</strong> regardless of priority. Even a <code>priority: 1</code> exclusion overrides a <code>priority: 1000</code> expose policy. No ResourceSlice entry is published for excluded devices.</p>
+  </div>
+
+  <hr>
+
+  <h3 id="example-9">5.9 Example 9: OVN-Kubernetes Networks via Our Generic Driver <span class="badge badge-nic">NIC</span></h3>
+
+  <p><strong>Scenario:</strong> OVN-Kubernetes uses <code>ovn-k8s-cni-overlay</code> as its CNI binary. Our generic driver can serve OVN-K use cases directly — no separate OVN-K DRA driver needed.</p>
+
+  <!-- Diagram 6: OVN-K Integration -->
+  <div class="diagram-container">
+    <div class="diagram-title">Diagram 6 — OVN-Kubernetes Integration via Generic Driver</div>
+    <svg width="750" height="300" viewBox="0 0 750 300" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="arrow6" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#58a6ff"/>
+        </marker>
+      </defs>
+
+      <!-- Switchdev VF path -->
+      <rect x="30" y="30" width="160" height="50" rx="8" fill="#1f3a5f" stroke="#58a6ff" stroke-width="1.5"/>
+      <text x="110" y="50" text-anchor="middle" fill="#c9d1d9" font-size="10" font-weight="600">Switchdev VF</text>
+      <text x="110" y="68" text-anchor="middle" fill="#79c0ff" font-size="9">enp4s0f0v0</text>
+
+      <rect x="230" y="30" width="170" height="50" rx="8" fill="#1f3a5f" stroke="#58a6ff" stroke-width="1.5"/>
+      <text x="315" y="50" text-anchor="middle" fill="#c9d1d9" font-size="10" font-weight="600">DeviceExposurePolicy</text>
+      <text x="315" y="68" text-anchor="middle" fill="#79c0ff" font-size="9">ovnk-accelerated-vfs</text>
+
+      <rect x="440" y="30" width="140" height="50" rx="8" fill="#1f3f2a" stroke="#3fb950" stroke-width="1.5"/>
+      <text x="510" y="50" text-anchor="middle" fill="#c9d1d9" font-size="10" font-weight="600">ResourceSlice</text>
+      <text x="510" y="68" text-anchor="middle" fill="#3fb950" font-size="9">exclusive VF device</text>
+
+      <rect x="620" y="30" width="110" height="50" rx="8" fill="#2d1f3f" stroke="#bc8cff" stroke-width="1.5"/>
+      <text x="675" y="50" text-anchor="middle" fill="#c9d1d9" font-size="10" font-weight="600">OVN-K CNI</text>
+      <text x="675" y="68" text-anchor="middle" fill="#bc8cff" font-size="9">ovn-k8s-cni-overlay</text>
+
+      <line x1="190" y1="55" x2="225" y2="55" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arrow6)"/>
+      <line x1="400" y1="55" x2="435" y2="55" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arrow6)"/>
+      <line x1="580" y1="55" x2="615" y2="55" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arrow6)"/>
+
+      <!-- Localnet path -->
+      <rect x="30" y="120" width="160" height="50" rx="8" fill="#1f3a5f" stroke="#58a6ff" stroke-width="1.5"/>
+      <text x="110" y="140" text-anchor="middle" fill="#c9d1d9" font-size="10" font-weight="600">Localnet PF</text>
+      <text x="110" y="158" text-anchor="middle" fill="#79c0ff" font-size="9">enp6s0f0</text>
+
+      <rect x="230" y="120" width="170" height="50" rx="8" fill="#1f3a5f" stroke="#58a6ff" stroke-width="1.5"/>
+      <text x="315" y="140" text-anchor="middle" fill="#c9d1d9" font-size="10" font-weight="600">DeviceExposurePolicy</text>
+      <text x="315" y="158" text-anchor="middle" fill="#79c0ff" font-size="9">ovnk-localnet-uplink</text>
+
+      <rect x="440" y="120" width="140" height="50" rx="8" fill="#1f3f2a" stroke="#3fb950" stroke-width="1.5"/>
+      <text x="510" y="140" text-anchor="middle" fill="#c9d1d9" font-size="10" font-weight="600">ResourceSlice</text>
+      <text x="510" y="158" text-anchor="middle" fill="#3fb950" font-size="9">shared, multi-alloc</text>
+
+      <rect x="620" y="120" width="110" height="50" rx="8" fill="#2d1f3f" stroke="#bc8cff" stroke-width="1.5"/>
+      <text x="675" y="140" text-anchor="middle" fill="#c9d1d9" font-size="10" font-weight="600">OVN-K CNI</text>
+      <text x="675" y="158" text-anchor="middle" fill="#bc8cff" font-size="9">localnet topology</text>
+
+      <line x1="190" y1="145" x2="225" y2="145" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arrow6)"/>
+      <line x1="400" y1="145" x2="435" y2="145" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arrow6)"/>
+      <line x1="580" y1="145" x2="615" y2="145" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#arrow6)"/>
+
+      <!-- Key points -->
+      <rect x="80" y="200" width="590" height="80" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+      <text x="375" y="220" text-anchor="middle" fill="#bc8cff" font-size="10" font-weight="600">KEY: Generic Driver Handles OVN-K</text>
+      <text x="375" y="240" text-anchor="middle" fill="#c9d1d9" font-size="9">• Accelerated VFs: exclusive, one pod per VF. CNI configures VF representor on br-int.</text>
+      <text x="375" y="257" text-anchor="middle" fill="#c9d1d9" font-size="9">• Localnet uplink: shared (multi-alloc). Each pod gets veth via OVN-K. PF stays on host.</text>
+      <text x="375" y="274" text-anchor="middle" fill="#8b949e" font-size="9">• additionalAttributes: physicalNetworkName for device selection. Runtime config in NetworkTopology step.</text>
+    </svg>
+  </div>
+
+  <div class="code-block">
+    <div class="code-header"><span class="lang-badge">YAML</span> OVN-K localnet uplink policy</div>
+    <div class="code-content"><span class="y-key">apiVersion</span>: <span class="y-str">networking.dra.io/v1alpha1</span>
+<span class="y-key">kind</span>: <span class="y-str">DeviceExposurePolicy</span>
+<span class="y-key">metadata</span>:
+  <span class="y-key">name</span>: <span class="y-str">ovnk-localnet-uplink</span>
+<span class="y-key">spec</span>:
+  <span class="y-key">priority</span>: <span class="y-num">150</span>
+  <span class="y-key">selector</span>:
+    <span class="y-key">cel</span>: <span class="y-str">&gt;-
+      device.attributes["dra.networking"].type == "pf" &amp;&amp;
+      device.attributes["dra.networking"].ifName == "enp6s0f0"</span>
+  <span class="y-key">action</span>: <span class="y-str">expose</span>
+  <span class="y-key">exposure</span>:
+    <span class="y-key">deviceNameSuffix</span>: <span class="y-str">"-localnet"</span>
+    <span class="y-key">allowMultipleAllocations</span>: <span class="y-bool">true</span>
+    <span class="y-key">capacity</span>:
+      <span class="y-key">connections</span>:
+        <span class="y-key">value</span>: <span class="y-str">"128"</span>
+        <span class="y-key">requestPolicy</span>:
+          <span class="y-key">default</span>: <span class="y-str">"1"</span>
+    <span class="y-key">supportedCNIPlugins</span>:
+      - <span class="y-key">name</span>: <span class="y-str">ovn-k8s-cni-overlay</span>
+        <span class="y-key">exclusive</span>: <span class="y-bool">false</span>
+        <span class="y-key">consumePerAllocation</span>:
+          <span class="y-key">connections</span>: <span class="y-num">1</span>
+    <span class="y-key">additionalAttributes</span>:
+      <span class="y-key">"dra.networking/physicalNetworkName"</span>: <span class="y-str">"localnet1"</span></div>
+  </div>
+
+  <hr>
+
+  <!-- Section 6 -->
+  <h2 id="reference-node"><span class="section-num">6.</span> Complete Reference Node</h2>
+
+  <h3 id="node-inventory">6.1 Node Inventory</h3>
+
+  <p>Node <code>worker-1</code>:</p>
+
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr><th>Device</th><th>Interface</th><th>Type</th><th>PCI Address</th><th>Speed</th><th>NUMA</th><th>Notes</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>PF 0</td><td><code>enp3s0f0</code></td><td>Physical Function</td><td><code>0000:03:00.0</code></td><td>100 GbE</td><td>0</td><td>ConnectX-7, 8 VFs, RDMA, macvlan parent</td></tr>
+        <tr><td>PF 1</td><td><code>enp3s0f1</code></td><td>Physical Function</td><td><code>0000:03:00.1</code></td><td>25 GbE</td><td>0</td><td>ConnectX-7, 4 VFs, RDMA</td></tr>
+        <tr><td>VF 0–7 of PF 0</td><td><code>enp3s0f0v0</code>–<code>v7</code></td><td>Virtual Function</td><td><code>0000:03:00.2</code>–<code>01.1</code></td><td>—</td><td>0</td><td>SR-IOV</td></tr>
+        <tr><td>VF 0–3 of PF 1</td><td><code>enp3s0f1v0</code>–<code>v3</code></td><td>Virtual Function</td><td><code>0000:03:01.2</code>–<code>01.5</code></td><td>—</td><td>0</td><td>SR-IOV</td></tr>
+        <tr><td>Bridge</td><td><code>br-data</code></td><td>Linux bridge</td><td>—</td><td>—</td><td>—</td><td>VLAN filtering, MTU 9000</td></tr>
+        <tr><td>Management</td><td><code>eno1</code></td><td>Regular NIC</td><td>—</td><td>1 GbE</td><td>—</td><td>SSH/BMC</td></tr>
+        <tr><td>OVN-K</td><td><code>br-int</code></td><td>OVS bridge</td><td>—</td><td>—</td><td>—</td><td>Cluster CNI</td></tr>
+        <tr><td>OVN-K</td><td><code>ovn-k8s-mp0</code></td><td>Virtual</td><td>—</td><td>—</td><td>—</td><td>Cluster CNI</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Diagram 8: Complete Reference Node Topology -->
+  <div class="diagram-container">
+    <div class="diagram-title">Diagram 8 — Complete Reference Node Topology (worker-1)</div>
+    <svg width="780" height="480" viewBox="0 0 780 480" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="arrow8" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+          <polygon points="0 0, 8 3, 0 6" fill="#58a6ff"/>
+        </marker>
+      </defs>
+
+      <!-- Node boundary -->
+      <rect x="10" y="10" width="760" height="460" rx="12" fill="none" stroke="#30363d" stroke-width="2" stroke-dasharray="6"/>
+      <text x="390" y="35" text-anchor="middle" fill="#8b949e" font-size="12" font-weight="600">Node: worker-1</text>
+
+      <!-- PF0 section -->
+      <rect x="30" y="50" width="350" height="250" rx="8" fill="#161b22" stroke="#58a6ff" stroke-width="1.5"/>
+      <text x="205" y="72" text-anchor="middle" fill="#58a6ff" font-size="11" font-weight="700">PF0: enp3s0f0 (100 GbE)</text>
+      <text x="205" y="88" text-anchor="middle" fill="#8b949e" font-size="9">Pool: worker-1-sriov-pf0 | Counter: pf0-counters</text>
+
+      <!-- PF0 personas -->
+      <rect x="50" y="100" width="130" height="40" rx="6" fill="#1f3a5f" stroke="#58a6ff" stroke-width="1"/>
+      <text x="115" y="118" text-anchor="middle" fill="#c9d1d9" font-size="9" font-weight="600">-macvlan</text>
+      <text x="115" y="132" text-anchor="middle" fill="#3fb950" font-size="8">multi-alloc, cap:64</text>
+
+      <rect x="200" y="100" width="130" height="40" rx="6" fill="#3f1f1f" stroke="#f85149" stroke-width="1"/>
+      <text x="265" y="118" text-anchor="middle" fill="#c9d1d9" font-size="9" font-weight="600">-passthrough</text>
+      <text x="265" y="132" text-anchor="middle" fill="#f85149" font-size="8">exclusive, drains all</text>
+
+      <!-- VFs of PF0 -->
+      <rect x="50" y="155" width="310" height="50" rx="6" fill="#1f3a5f" stroke="#79c0ff" stroke-width="1"/>
+      <text x="205" y="172" text-anchor="middle" fill="#79c0ff" font-size="9" font-weight="600">8 VFs: enp3s0f0v0 – v7</text>
+      <text x="205" y="190" text-anchor="middle" fill="#8b949e" font-size="8">exclusive, sriov + host-device | each: 1 slot, bandwidth valueFrom</text>
+
+      <!-- Counter summary -->
+      <rect x="50" y="220" width="310" height="65" rx="6" fill="#3f3f1f" stroke="#d29922" stroke-width="1"/>
+      <text x="205" y="238" text-anchor="middle" fill="#d29922" font-size="9" font-weight="600">pf0-counters</text>
+      <text x="205" y="254" text-anchor="middle" fill="#c9d1d9" font-size="8">exclusion-slots: 9 | bandwidth: 100000</text>
+      <text x="205" y="270" text-anchor="middle" fill="#c9d1d9" font-size="8">macvlan-capacity: 64</text>
+
+      <!-- PF1 section -->
+      <rect x="400" y="50" width="350" height="200" rx="8" fill="#161b22" stroke="#58a6ff" stroke-width="1.5"/>
+      <text x="575" y="72" text-anchor="middle" fill="#58a6ff" font-size="11" font-weight="700">PF1: enp3s0f1 (25 GbE)</text>
+      <text x="575" y="88" text-anchor="middle" fill="#8b949e" font-size="9">Pool: worker-1-sriov-pf1 | Counter: pf1-counters</text>
+
+      <!-- PF1 persona -->
+      <rect x="420" y="100" width="160" height="40" rx="6" fill="#3f1f1f" stroke="#f85149" stroke-width="1"/>
+      <text x="500" y="118" text-anchor="middle" fill="#c9d1d9" font-size="9" font-weight="600">enp3s0f1</text>
+      <text x="500" y="132" text-anchor="middle" fill="#f85149" font-size="8">host-device passthrough</text>
+
+      <!-- VFs of PF1 -->
+      <rect x="420" y="155" width="310" height="40" rx="6" fill="#1f3a5f" stroke="#79c0ff" stroke-width="1"/>
+      <text x="575" y="172" text-anchor="middle" fill="#79c0ff" font-size="9" font-weight="600">4 VFs: enp3s0f1v0 – v3</text>
+      <text x="575" y="190" text-anchor="middle" fill="#8b949e" font-size="8">exclusive, sriov + host-device</text>
+
+      <!-- PF1 counters -->
+      <rect x="420" y="205" width="310" height="30" rx="6" fill="#3f3f1f" stroke="#d29922" stroke-width="1"/>
+      <text x="575" y="224" text-anchor="middle" fill="#c9d1d9" font-size="8">pf1-counters: exclusion-slots: 5, bandwidth: 25000</text>
+
+      <!-- Bridge -->
+      <rect x="400" y="270" width="200" height="60" rx="8" fill="#1f3f2a" stroke="#3fb950" stroke-width="1.5"/>
+      <text x="500" y="292" text-anchor="middle" fill="#3fb950" font-size="10" font-weight="600">br-data</text>
+      <text x="500" y="308" text-anchor="middle" fill="#c9d1d9" font-size="9">Linux bridge, multi-alloc</text>
+      <text x="500" y="322" text-anchor="middle" fill="#8b949e" font-size="8">ports: 64, VLAN filtering, MTU 9000</text>
+
+      <!-- Excluded devices -->
+      <rect x="30" y="320" width="350" height="130" rx="8" fill="#161b22" stroke="#f85149" stroke-width="1.5" stroke-dasharray="4"/>
+      <text x="205" y="342" text-anchor="middle" fill="#f85149" font-size="10" font-weight="600">EXCLUDED (not published)</text>
+
+      <rect x="50" y="355" width="100" height="35" rx="4" fill="#3f1f1f" stroke="#f85149" stroke-width="1" opacity="0.6"/>
+      <text x="100" y="377" text-anchor="middle" fill="#f85149" font-size="8">eno1</text>
+
+      <rect x="165" y="355" width="80" height="35" rx="4" fill="#3f1f1f" stroke="#f85149" stroke-width="1" opacity="0.6"/>
+      <text x="205" y="377" text-anchor="middle" fill="#f85149" font-size="8">br-int</text>
+
+      <rect x="260" y="355" width="100" height="35" rx="4" fill="#3f1f1f" stroke="#f85149" stroke-width="1" opacity="0.6"/>
+      <text x="310" y="377" text-anchor="middle" fill="#f85149" font-size="8">ovn-k8s-mp0</text>
+
+      <text x="205" y="420" text-anchor="middle" fill="#8b949e" font-size="8">Management + OVN-K cluster CNI infrastructure</text>
+
+      <!-- Summary -->
+      <rect x="400" y="350" width="350" height="100" rx="8" fill="#161b22" stroke="#30363d" stroke-width="1"/>
+      <text x="575" y="372" text-anchor="middle" fill="#d29922" font-size="10" font-weight="600">TOTALS</text>
+      <text x="575" y="392" text-anchor="middle" fill="#c9d1d9" font-size="9">3 ResourceSlice objects</text>
+      <text x="575" y="408" text-anchor="middle" fill="#c9d1d9" font-size="9">16 device entries (8 policies)</text>
+      <text x="575" y="424" text-anchor="middle" fill="#c9d1d9" font-size="9">2 PF personas + 8 VFs + 1 PF + 4 VFs + 1 bridge</text>
+      <text x="575" y="440" text-anchor="middle" fill="#8b949e" font-size="8">Excluded: eno1, br-int, ovn-k8s-mp0</text>
+    </svg>
+  </div>
+
+  <h3 id="complete-policy-set">6.2 Complete DeviceExposurePolicy Set</h3>
+
+  <div class="code-block">
+    <div class="code-header"><span class="lang-badge">YAML</span> 8 policies for worker-1</div>
+    <div class="code-content"><span class="y-comment"># 1. Exclude cluster CNI infrastructure</span>
+<span class="y-key">name</span>: <span class="y-str">exclude-cluster-cni</span>
+<span class="y-key">priority</span>: <span class="y-num">1000</span>
+<span class="y-key">selector.cel</span>: <span class="y-str">device.attributes["dra.networking"].ifName in ["br-int", "ovn-k8s-mp0", "breth0", "ovn-k8s-gw0"]</span>
+<span class="y-key">action</span>: <span class="y-str">exclude</span>
+---
+<span class="y-comment"># 2. Exclude management interface</span>
+<span class="y-key">name</span>: <span class="y-str">exclude-management</span>
+<span class="y-key">priority</span>: <span class="y-num">1000</span>
+<span class="y-key">selector.cel</span>: <span class="y-str">device.attributes["dra.networking"].ifName == "eno1"</span>
+<span class="y-key">action</span>: <span class="y-str">exclude</span>
+---
+<span class="y-comment"># 3. PF0 macvlan persona (shared)</span>
+<span class="y-key">name</span>: <span class="y-str">pf0-macvlan</span>
+<span class="y-key">deviceNameSuffix</span>: <span class="y-str">"-macvlan"</span>
+<span class="y-key">allowMultipleAllocations</span>: <span class="y-bool">true</span>
+<span class="y-key">capacity.macvlans</span>: <span class="y-str">"64"</span>
+<span class="y-key">supportedCNIPlugins</span>: [<span class="y-str">macvlan</span>]
+---
+<span class="y-comment"># 4. PF0 passthrough persona (exclusive)</span>
+<span class="y-key">name</span>: <span class="y-str">pf0-passthrough</span>
+<span class="y-key">deviceNameSuffix</span>: <span class="y-str">"-passthrough"</span>
+<span class="y-key">allowMultipleAllocations</span>: <span class="y-bool">false</span>
+<span class="y-key">supportedCNIPlugins</span>: [<span class="y-str">host-device</span> (<span class="y-key">exclusive</span>: <span class="y-bool">true</span>)]
+---
+<span class="y-comment"># 5. PF0 VFs: sriov + host-device</span>
+<span class="y-key">name</span>: <span class="y-str">pf0-vfs</span>
+<span class="y-key">selector.cel</span>: <span class="y-str">type == "vf" &amp;&amp; pfName == "enp3s0f0"</span>
+<span class="y-key">supportedCNIPlugins</span>: [<span class="y-str">sriov</span>, <span class="y-str">host-device</span>]
+---
+<span class="y-comment"># 6. PF1: host-device passthrough only</span>
+<span class="y-key">name</span>: <span class="y-str">pf1-passthrough</span>
+<span class="y-key">supportedCNIPlugins</span>: [<span class="y-str">host-device</span> (<span class="y-key">exclusive</span>: <span class="y-bool">true</span>)]
+---
+<span class="y-comment"># 7. PF1 VFs: sriov + host-device</span>
+<span class="y-key">name</span>: <span class="y-str">pf1-vfs</span>
+<span class="y-key">selector.cel</span>: <span class="y-str">type == "vf" &amp;&amp; pfName == "enp3s0f1"</span>
+<span class="y-key">supportedCNIPlugins</span>: [<span class="y-str">sriov</span>, <span class="y-str">host-device</span>]
+---
+<span class="y-comment"># 8. Bridge br-data</span>
+<span class="y-key">name</span>: <span class="y-str">bridge-br-data</span>
+<span class="y-key">allowMultipleAllocations</span>: <span class="y-bool">true</span>
+<span class="y-key">capacity.ports</span>: <span class="y-str">"64"</span>
+<span class="y-key">supportedCNIPlugins</span>: [<span class="y-str">bridge</span>]</div>
+  </div>
+
+  <h3 id="resulting-slices">6.3 Resulting ResourceSlices</h3>
+
+  <div class="code-block">
+    <div class="code-header"><span class="lang-badge">YAML</span> ResourceSlice 1: PF0 Pool (2 PF personas + 8 VFs)</div>
+    <div class="code-content"><span class="y-key">apiVersion</span>: <span class="y-str">resource.k8s.io/v1</span>
+<span class="y-key">kind</span>: <span class="y-str">ResourceSlice</span>
+<span class="y-key">metadata</span>:
+  <span class="y-key">name</span>: <span class="y-str">worker-1-sriov-pf0</span>
+<span class="y-key">spec</span>:
+  <span class="y-key">driver</span>: <span class="y-str">dra.networking</span>
+  <span class="y-key">pool</span>:
+    <span class="y-key">name</span>: <span class="y-str">worker-1-sriov-pf0</span>
+  <span class="y-key">nodeName</span>: <span class="y-str">worker-1</span>
+  <span class="y-key">sharedCounters</span>:
+    - <span class="y-key">name</span>: <span class="y-str">pf0-counters</span>
+      <span class="y-key">counters</span>:
+        <span class="y-key">exclusion-slots</span>: { <span class="y-key">value</span>: <span class="y-num">9</span> }
+        <span class="y-key">bandwidth</span>: { <span class="y-key">value</span>: <span class="y-num">100000</span> }
+        <span class="y-key">macvlan-capacity</span>: { <span class="y-key">value</span>: <span class="y-num">64</span> }
+  <span class="y-key">devices</span>:
+    - <span class="y-key">name</span>: <span class="y-str">enp3s0f0-macvlan</span>      <span class="y-comment"># PF macvlan persona</span>
+      <span class="y-key">allowMultipleAllocations</span>: <span class="y-bool">true</span>
+    - <span class="y-key">name</span>: <span class="y-str">enp3s0f0-passthrough</span>  <span class="y-comment"># PF passthrough persona</span>
+      <span class="y-comment"># consumesCounters: all of pf0-counters</span>
+    - <span class="y-key">name</span>: <span class="y-str">enp3s0f0v0</span>           <span class="y-comment"># VF 0 (exclusive)</span>
+    <span class="y-comment"># ... VFs 1–6 ...</span>
+    - <span class="y-key">name</span>: <span class="y-str">enp3s0f0v7</span>           <span class="y-comment"># VF 7 (exclusive)</span></div>
+  </div>
+
+  <div class="code-block">
+    <div class="code-header"><span class="lang-badge">YAML</span> ResourceSlice 2: PF1 Pool (1 PF + 4 VFs)</div>
+    <div class="code-content"><span class="y-key">apiVersion</span>: <span class="y-str">resource.k8s.io/v1</span>
+<span class="y-key">kind</span>: <span class="y-str">ResourceSlice</span>
+<span class="y-key">metadata</span>:
+  <span class="y-key">name</span>: <span class="y-str">worker-1-sriov-pf1</span>
+<span class="y-key">spec</span>:
+  <span class="y-key">driver</span>: <span class="y-str">dra.networking</span>
+  <span class="y-key">pool</span>:
+    <span class="y-key">name</span>: <span class="y-str">worker-1-sriov-pf1</span>
+  <span class="y-key">nodeName</span>: <span class="y-str">worker-1</span>
+  <span class="y-key">sharedCounters</span>:
+    - <span class="y-key">name</span>: <span class="y-str">pf1-counters</span>
+      <span class="y-key">counters</span>:
+        <span class="y-key">exclusion-slots</span>: { <span class="y-key">value</span>: <span class="y-num">5</span> }
+        <span class="y-key">bandwidth</span>: { <span class="y-key">value</span>: <span class="y-num">25000</span> }
+  <span class="y-key">devices</span>:
+    - <span class="y-key">name</span>: <span class="y-str">enp3s0f1</span>            <span class="y-comment"># PF (host-device only)</span>
+    - <span class="y-key">name</span>: <span class="y-str">enp3s0f1v0</span>          <span class="y-comment"># VF 0</span>
+    <span class="y-comment"># ... VFs 1–2 ...</span>
+    - <span class="y-key">name</span>: <span class="y-str">enp3s0f1v3</span>          <span class="y-comment"># VF 3</span></div>
+  </div>
+
+  <div class="code-block">
+    <div class="code-header"><span class="lang-badge">YAML</span> ResourceSlice 3: Bridge br-data</div>
+    <div class="code-content"><span class="y-key">apiVersion</span>: <span class="y-str">resource.k8s.io/v1</span>
+<span class="y-key">kind</span>: <span class="y-str">ResourceSlice</span>
+<span class="y-key">metadata</span>:
+  <span class="y-key">name</span>: <span class="y-str">worker-1-bridge-br-data</span>
+<span class="y-key">spec</span>:
+  <span class="y-key">driver</span>: <span class="y-str">dra.networking</span>
+  <span class="y-key">pool</span>:
+    <span class="y-key">name</span>: <span class="y-str">worker-1-bridge-br-data</span>
+  <span class="y-key">nodeName</span>: <span class="y-str">worker-1</span>
+  <span class="y-key">devices</span>:
+    - <span class="y-key">name</span>: <span class="y-str">br-data</span>
+      <span class="y-key">allowMultipleAllocations</span>: <span class="y-bool">true</span>
+      <span class="y-key">basic</span>:
+        <span class="y-key">attributes</span>:
+          <span class="y-key">dra.networking/type</span>: { <span class="y-key">string</span>: <span class="y-str">"bridge"</span> }
+          <span class="y-key">dra.networking/bridgeType</span>: { <span class="y-key">string</span>: <span class="y-str">"linux"</span> }
+          <span class="y-key">dra.networking/mtu</span>: { <span class="y-key">int</span>: <span class="y-num">9000</span> }
+          <span class="y-key">dra.networking/vlanFiltering</span>: { <span class="y-key">bool</span>: <span class="y-bool">true</span> }
+          <span class="y-key">dra.networking/supportedCNIs</span>: { <span class="y-key">stringSlice</span>: [<span class="y-str">bridge</span>] }
+        <span class="y-key">capacity</span>:
+          <span class="y-key">dra.networking/ports</span>:
+            <span class="y-key">value</span>: <span class="y-str">"64"</span></div>
+  </div>
+
+  <h3 id="ref-summary">6.4 Summary</h3>
+
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr><th>ResourceSlice</th><th>Pool</th><th>Devices</th><th>SharedCounters</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>worker-1-sriov-pf0</code></td><td><code>worker-1-sriov-pf0</code></td><td>2 PF personas + 8 VFs = 10</td><td>exclusion-slots: 9, bandwidth: 100000, macvlan-capacity: 64</td></tr>
+        <tr><td><code>worker-1-sriov-pf1</code></td><td><code>worker-1-sriov-pf1</code></td><td>1 PF + 4 VFs = 5</td><td>exclusion-slots: 5, bandwidth: 25000</td></tr>
+        <tr><td><code>worker-1-bridge-br-data</code></td><td><code>worker-1-bridge-br-data</code></td><td>1 bridge (multi-alloc)</td><td>None</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p><strong>Not published:</strong> <code>eno1</code>, <code>br-int</code>, <code>ovn-k8s-mp0</code> (excluded by policy). Total: 3 ResourceSlice objects, 16 device entries (8 policies).</p>
+
+  <h3 id="app-developer">6.5 App Developer Experience</h3>
+
+  <p>All the complexity above is invisible to the application developer. They reference DeviceClass names in their ResourceClaim and the scheduler handles the rest.</p>
+
+  <div class="code-block">
+    <div class="code-header"><span class="lang-badge">YAML</span> App developer's ResourceClaimTemplate</div>
+    <div class="code-content"><span class="y-key">apiVersion</span>: <span class="y-str">resource.k8s.io/v1</span>
+<span class="y-key">kind</span>: <span class="y-str">ResourceClaimTemplate</span>
+<span class="y-key">metadata</span>:
+  <span class="y-key">name</span>: <span class="y-str">my-app-network</span>
+<span class="y-key">spec</span>:
+  <span class="y-key">spec</span>:
+    <span class="y-key">devices</span>:
+      <span class="y-key">requests</span>:
+        - <span class="y-key">name</span>: <span class="y-str">vf0</span>
+          <span class="y-key">exactly</span>:
+            <span class="y-key">deviceClassName</span>: <span class="y-str">ai-bonded-rdma-vf0</span>
+        - <span class="y-key">name</span>: <span class="y-str">vf1</span>
+          <span class="y-key">exactly</span>:
+            <span class="y-key">deviceClassName</span>: <span class="y-str">ai-bonded-rdma-vf1</span></div>
+  </div>
+
+  <p>No opaque config. No topology references. No knowledge of bonds, VLANs, macvlans, or capacity counters. The DeviceClass names are the only interface between the platform team and the app developer.</p>
+
+  <hr>
+
+  <!-- Section 7 -->
+  <h2 id="open-questions"><span class="section-num">7.</span> Open Questions</h2>
+
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr><th>#</th><th>Question</th><th>Notes</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>1</td><td><strong>Exclusion group scheduling-time enforcement.</strong> Can DRA's capacity model support "consume once per type" semantics?</td><td>Current DRA capacity is strictly per-allocation. Without "first-allocation lock" support, exclusion groups require either admin-separated policies or driver-side rejection. See Section 3.</td></tr>
+        <tr><td>2</td><td><strong>Dynamic VF count changes.</strong> How should the driver handle <code>numVFs</code> changes at runtime?</td><td>Must atomically update the counter set and device list. Generation bump triggers scheduler re-evaluation. Must never remove in-use devices.</td></tr>
+        <tr><td>3</td><td><strong>Macvlan capacity discovery.</strong> How does the driver determine the maximum macvlan count?</td><td>The driver doesn't — the admin specifies it in the policy's <code>exposure.capacity.macvlans.value</code>. The driver copies it verbatim.</td></tr>
+        <tr><td>4</td><td><strong><code>requestPolicy.default</code> with no capacity request.</strong> Does a claim without <code>capacity.requests</code> trigger default consumption?</td><td>Per KEP 5941 design, yes. Verify with upstream implementation.</td></tr>
+        <tr><td>5</td><td><strong>PF macvlan + VF allocation interaction.</strong> Can macvlans and VFs coexist on the same PF?</td><td>Generally yes (different kernel paths). The current design models them as independent capacity dimensions. Macvlan allocations don't consume exclusion-slots; VF allocations don't consume macvlan-capacity.</td></tr>
+        <tr><td>6</td><td><strong><code>allowMultipleAllocations</code> identity.</strong> All allocations of a multi-allocatable device share the same device name. How to distinguish them?</td><td>The <code>AllocationResult</code> contains the claim UID. May need enhancement for debugging.</td></tr>
+        <tr><td>7</td><td><strong>Cross-pool shared counters.</strong> Can a device in one pool consume counters from another pool?</td><td>KEP 4815 scopes counters to a pool. Current design avoids cross-pool by putting PF + VFs + macvlan capacity in a single pool.</td></tr>
+        <tr><td>8</td><td><strong>Bridge auto-creation.</strong> Should the driver create bridges, or only discover pre-existing ones?</td><td>Discovery-only initially. Auto-creation needs coordination with host networking (NetworkManager, systemd-networkd).</td></tr>
+        <tr><td>9</td><td><strong><code>DRAListTypeAttributes</code> fallback.</strong> <code>stringSlice</code> is alpha (KEP 5491, K8s 1.36). What is the fallback?</td><td>Comma-separated string with <code>contains()</code>. Works with GA API. Substring collision risk is low for known CNI names but not zero.</td></tr>
+        <tr><td>10</td><td><strong>Policy validation webhook.</strong> Should the driver validate that <code>consumePerAllocation</code> entries match <code>capacity</code> keys?</td><td>Yes. A validating webhook should reject policies where <code>consumePerAllocation</code> references a counter not defined in <code>capacity</code>.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+
+
+
+</main>
+
+</body>
+</html>
