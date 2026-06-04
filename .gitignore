@@ -1,0 +1,20 @@
+# Ignore everything by default
+*
+
+# Allow these folders and their contents
+!.github/
+!.github/**
+!.claude/
+!.claude/**
+!html/
+!html/**
+!md/
+!md/**
+!hooks/
+!hooks/**
+
+# Allow these root files
+!Makefile
+!README.md
+!index.html
+!.gitignore

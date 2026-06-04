@@ -1,0 +1,12 @@
+#!/bin/bash
+# Pre-commit hook: validates HTML/MD parity before allowing commit.
+# Install with: make install-hooks
+
+staged=$(git diff --cached --name-only -- 'md/' 'html/' 'README.md' 'index.html')
+if [ -n "$staged" ]; then
+  echo "Detected staged changes in md/, html/, README.md, or index.html"
+  echo "Running validation..."
+  make validate
+  exit $?
+fi
+exit 0
