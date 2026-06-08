@@ -77,6 +77,7 @@ body {
   border-right: 1px solid var(--border);
   overflow-y: auto;
   padding: 1.5rem 0;
+  padding-bottom: 3.5rem;
   z-index: 100;
 }
 

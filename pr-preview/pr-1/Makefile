@@ -22,13 +22,13 @@ validate:
 		| tee .validation-result
 	@echo ""
 	@echo "==> Checking result..."
-	@grep -q "PASS" .validation-result || (echo "VALIDATION FAILED"; rm -f .validation-result .validation-raw.json; exit 1)
+	@grep -qx "PASS" .validation-result || (echo "VALIDATION FAILED"; rm -f .validation-result .validation-raw.json; exit 1)
 	@rm -f .validation-result .validation-raw.json
 	@echo "VALIDATION PASSED"
 
 generate:
 	@echo "==> Checking for md changes..."
-	@changed_md=$$(git diff --name-only -- 'md/*.md' 'md/**'); \
+	@changed_md=$$(git diff --name-only HEAD -- 'md/*.md' 'md/**'); \
 	missing_html=""; \
 	for f in md/*.md; do \
 		base=$$(basename "$$f" .md); \

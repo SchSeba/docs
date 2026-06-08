@@ -64,12 +64,16 @@ For each `.md` file in `md/`:
 
 ### Check D — GitHub Links
 
-1. **index.html** must contain a link to the repository
-   (`https://github.com/SchSeba/docs`) — either in a contribute section or
-   footer. It must also include a link to open PRs (the `/pulls` URL).
+Note: the canonical repository URL is defined in the `Makefile` as `REPO_URL`
+(default: `https://github.com/SchSeba/docs`). Read that value before checking
+links so validation works for forks that override `REPO_URL`.
+
+1. **index.html** must contain a link to the repository — either in a
+   contribute section or footer. It must also include a link to open PRs
+   (the `/pulls` URL).
 2. **Every HTML file** in `html/` must contain an "Edit source on GitHub" link
    (class `.edit-link`) in the sidebar that points to the correct markdown
-   source file: `https://github.com/SchSeba/docs/blob/main/md/<filename>.md`
+   source file: `<REPO_URL>/blob/main/md/<filename>.md`
 3. Verify the link href matches the actual filename of the corresponding `.md`
    source.
 
@@ -101,7 +105,7 @@ PASS
 FAIL: md/new-doc.md - no corresponding html/new-doc.html found
 FAIL: README.md - missing entry for md/new-doc.md
 FAIL: index.html - missing card for md/new-doc.md
-FAIL: index.html - missing repository link to https://github.com/SchSeba/docs
+FAIL: index.html - missing repository link
 FAIL: html/new-doc.html - missing "Edit source on GitHub" link
 FAIL: html/dra-chainable-networking-proposal.html - edit link points to wrong file
 FAIL: md/dra-chainable-networking-proposal.md - heading "## 5. Mixed NICs" not found in HTML
